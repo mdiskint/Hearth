@@ -1,0 +1,92 @@
+{
+  "domains": {
+    "Work": {
+      "id": "domain_work",
+      "name": "Work",
+      "description": "Projects you're building—Astryon, EOS, Hearth, SPARE PARTS, whatever comes next. Law school: still in it, pushing through even though part of you wants out. The tension between finishing what you started and wanting to be fully in the entrepreneurial work. Professional identity in flux: law student, entrepreneur, creator, vibe coder. The phase of hyper-ambition where this might be your last big window to make significant impact. Working with AI as a partner—clear vision, tools for implementation. Shipping. Momentum. The gap between what you imagine and what exists. Deadlines, scope creep, accountability. The feeling of making something that demands to exist.",
+      "excludes": "Money and financial security (that's Resources). How work affects your family (that's Relationships). The creative collision of ideas (that's Creative, unless it's specifically about a work project)."
+    },
+    "Relationships": {
+      "id": "domain_relationships",
+      "name": "Relationships",
+      "description": "Your wife and the partnership you're navigating—major decisions, the potential move to Marin, processing trauma together. Your kids: their mixed feelings, their adjustment, what they need vs. what's good for them long-term. The difference between leadership decisions and giving people what they want. Collaborators and co-founders. How you show up for others. The people whose opinions actually matter to you. Conflict, repair, trust. What you'd protect at any cost.",
+      "excludes": "Professional networking (that's Work). Your relationship with yourself (that's Self)."
+    },
+    "Creative": {
+      "id": "domain_creative",
+      "name": "Creative",
+      "description": "Emergence—when two ideas collide and create a third from nothing. The thing that lights you up most. Fiction writing, musical theater, the artistic work that lives alongside the entrepreneurial work. The Tipping Point, Legal Aid, SPARE PARTS—parallel universes you're building. Ideas that won't leave you alone. The collision that produces something new. Following tangents. Inspiration. The difference between making something useful and making something that demands to exist. Where you take risks.",
+      "excludes": "The execution side of creative projects (that's Work). Creative problem-solving in a business context (that's Work or Decisions)."
+    },
+    "Self": {
+      "id": "domain_self",
+      "name": "Self",
+      "description": "Who you are when everything clicks. Identity, values, the non-negotiables. Being 45, in a phase of hyper-ambition, viewing this as potentially your last major window. The tension of being a law student while knowing you want to be elsewhere—pushing through anyway. Father. Husband. Entrepreneur. Creator. Golden Gloves finalist who knows how to train through fear. ADHD and extreme anxiety diagnosed at 40—a mind that's powerful but uneven. Aphantasia that makes words your scaffolding instead of pictures. How you handle setbacks—do you spiral, get quiet, push through? How you talk to yourself. What you're proud of. What you avoid. Growth, becoming, the person you're trying to be.",
+      "excludes": "Your relationships with others (that's Relationships). Specific projects (that's Work or Creative)."
+    },
+    "Decisions": {
+      "id": "domain_decisions",
+      "name": "Decisions",
+      "description": "How you move through uncertainty. The moment before you commit. Weighing options, processing through dialogue rather than seeking direct advice. Gut-first vs. analysis paralysis. The Marin decision. Big swings. When to push and when to wait. Leadership decisions—what's needed vs. what's wanted. Knowing when you have enough information. Living with choices you can't undo.",
+      "excludes": "The emotions around decisions (those go in Fear, Anxiety, etc.). The execution after deciding (that's Work)."
+    },
+    "Resources": {
+      "id": "domain_resources",
+      "name": "Resources",
+      "description": "Money, time, energy, security. Being financially secure but conservative with money—you take risks creatively and professionally but not here. Protecting what you've built. The runway that lets you take swings. Time as the scarce resource: the hyper-ambition window won't last forever. What you invest in. What you won't gamble with. The baseline that has to stay stable so everything else can be bold.",
+      "excludes": "Career and professional work (that's Work). Family financial decisions that are really about relationships (that's Relationships)."
+    }
+  },
+  "emotions": {
+    "Fear": {
+      "id": "emotion_fear",
+      "name": "Fear",
+      "description": "What you're protecting. What you won't risk. The downside you can't stop imagining. For you: the fear of wasting this window, of building the wrong thing, of running out of time to make your mark. Fear for your kids—their safety, their adjustment, getting the big decisions right. The fear that comes with leadership: making calls that affect others when you can't be certain. What makes you hesitate. What makes you move carefully when your instinct is to move fast."
+    },
+    "Anger": {
+      "id": "emotion_anger",
+      "name": "Anger",
+      "description": "Boundaries crossed. What you won't tolerate. The heat that rises when something's wrong and you know it. Frustration with obstacles that slow momentum—technical blockers, bureaucracy, things that should work but don't. Impatience with yourself when you're not moving. The edge that shows up when you need to protect something or someone. What makes you push back hard."
+    },
+    "Shame": {
+      "id": "emotion_shame",
+      "name": "Shame",
+      "description": "Where you feel exposed. The stuff you hide or minimize. The gap between who you want to be and moments you fell short. Still being in law school when part of you wants out. Times you smoothed over tension when you should have been direct. What you don't want people to see. The inner critic. The voice that says you're running out of time or not doing enough."
+    },
+    "Grief": {
+      "id": "emotion_grief",
+      "name": "Grief",
+      "description": "What you've lost. What still carries weight. The recent traumatic events your family is processing. The house that burned. Paths not taken. The version of life that didn't happen. What's closed now that was once open. The weight that comes with major transitions—even good ones. What you're letting go of to move forward."
+    },
+    "Anxiety": {
+      "id": "emotion_anxiety",
+      "name": "Anxiety",
+      "description": "What you can't control. The spinning that happens when uncertainty is high. Future-focused worry: will this work, will the kids be okay, is this the right call. The tension between wanting to move fast and not being able to see around corners. What keeps you up. What you revisit even when you've decided. The terrible hum underneath what's at stake."
+    },
+    "Joy": {
+      "id": "emotion_joy",
+      "name": "Joy",
+      "description": "What lights you up. Energy, aliveness, the feeling when something clicks. Emergence—when two ideas create a third from nothing. Shipping something real. The moments when ambition and execution meet. Play, humor, the levity that matters to you. What makes you feel like yourself. Small celebrations before moving to what's next."
+    },
+    "Pride": {
+      "id": "emotion_pride",
+      "name": "Pride",
+      "description": "What you've built. What you want recognized. The work that reflects who you are. Pushing through law school even when you don't want to. Creating things that demand to exist. Being a father, a husband, someone who chose family over more money. Golden Gloves discipline carried into everything else. The quiet satisfaction of doing hard things. What you'd want your kids to see you doing."
+    },
+    "Love": {
+      "id": "emotion_love",
+      "name": "Love",
+      "description": "What you'd protect at any cost. Your wife, your kids—the center of everything. Collaborators you trust. The warmth underneath even when you're being direct. What makes the ambition worth it. Connection. Being known. The softness you don't always lead with but that drives the big choices."
+    },
+    "Curiosity": {
+      "id": "emotion_curiosity",
+      "name": "Curiosity",
+      "description": "What pulls you forward. The questions you can't leave alone. Why you follow tangents. The hunger to understand how things work—not just technically, but why people do what they do. Ideas that won't let go. The generative mode where you think out loud and collisions happen. What makes you dig deeper."
+    },
+    "Peace": {
+      "id": "emotion_peace",
+      "name": "Peace",
+      "description": "Where you're settled. What's resolved. The rare moments when the striving quiets and you're just here. What doesn't need work. The baseline you're protecting with Resources—security that lets everything else be bold. Acceptance. The exhale after something lands. What you're building toward even if you don't live there yet."
+    }
+  }
+}
