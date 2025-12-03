@@ -81,9 +81,9 @@ function App() {
           }
           if (profile.heat_map) {
             console.log('🔥 Heat map found in profile');
-            setHeatState(profile.heat_map);
             if (hearth.heatTracker) {
               hearth.heatTracker.import(profile.heat_map);
+              setHeatState(hearth.heatTracker.getState()); // Convert to state format
             }
             hasData = true;
           }
