@@ -1,14 +1,63 @@
 import { supabase } from '../lib/supabase-bundle.js';
 
 document.addEventListener('DOMContentLoaded', async () => {
-    // Load current state
-    const data = await chrome.storage.local.get(['eos', 'memories', 'heatMap']);
+    console.log('🔌 Extension popup opened');
+
+    // Check auth first
+    const { data: { user } } = await supabase.auth.getUser();
+    console.log('👤 User:', user?.id || 'Not signed in');
+
+    let memories = [];
+    let heatMap = null;
+
+    if (user) {
+        // Fetch fresh data from Supabase
+        console.log('☁️ Fetching memories from Supabase...');
+        try {
+            const { data: fetchedMemories, error } = await supabase
+                .from('memories')
+                .select('*')
+                .eq('user_id', user.id)
+                .order('created_at', { ascending: false });
+
+            if (error) {
+                console.error('❌ Error fetching memories:', error);
+            } else {
+                memories = fetchedMemories || [];
+                console.log('✅ Fetched', memories.length, 'memories from Supabase');
+            }
+
+            // Also fetch profile for heat map
+            console.log('☁️ Fetching profile from Supabase...');
+            const { data: profile, error: profileError } = await supabase
+                .from('profiles')
+                .select('heat_map')
+                .eq('id', user.id)
+                .single();
+
+            if (profileError) {
+                console.log('⚠️ No profile found');
+            } else {
+                heatMap = profile?.heat_map;
+                console.log('✅ Profile loaded');
+            }
+        } catch (err) {
+            console.error('❌ Error loading data:', err);
+        }
+    } else {
+        console.log('📭 Not signed in, using local storage fallback');
+        // Fallback to local storage if not signed in
+        const data = await chrome.storage.local.get(['memories', 'heatMap']);
+        memories = data.memories || [];
+        heatMap = data.heatMap;
+    }
 
     // Update memory count
-    document.getElementById('memory-count').textContent = data.memories?.length || 0;
+    console.log('📊 Displaying', memories.length, 'memories');
+    document.getElementById('memory-count').textContent = memories.length;
 
     // Render heat preview
-    renderHeatPreview(data.heatMap);
+    renderHeatPreview(heatMap);
 
     // Settings button
     document.getElementById('open-settings').addEventListener('click', () => {
@@ -16,7 +65,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
 
     // Auth Status
-    const { data: { user } } = await supabase.auth.getUser();
     renderAuth(user);
 });
 
