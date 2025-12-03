@@ -152,9 +152,14 @@ function App() {
     if (data.eos) {
       setUserEOS(data.eos);
       if (user?.id) {
-        await db.saveEOS(user.id, data.eos);
+        try {
+          console.log('💾 Saving EOS to Supabase...');
+          await db.saveEOS(user.id, data.eos);
+          console.log('✅ EOS saved successfully');
+        } catch (eosErr) {
+          console.error('❌ Failed to save EOS:', eosErr);
+        }
       }
-      console.log('User EOS saved');
     }
 
     // 3. Update Heat Map with baseline
