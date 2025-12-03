@@ -250,12 +250,38 @@
         return contextBlock + '\n\n' + userMessage;
     }
 
+    // Track conversation for memory extraction
+    let conversationHistory = [];
+
     function updateHearth(userMessage, hearthContext) {
-        // Send to background for heat map update and crystallization check
+        // Add to conversation history
+        conversationHistory.push({
+            role: 'user',
+            content: userMessage
+        });
+
+        // Keep only last 6 messages for context
+        if (conversationHistory.length > 6) {
+            conversationHistory = conversationHistory.slice(-6);
+        }
+
+        // Send to background for heat map update
         chrome.runtime.sendMessage({
             type: 'UPDATE_HEARTH',
             message: userMessage,
             context: hearthContext
+        });
+
+        // Check significance and extract memory in background
+        chrome.runtime.sendMessage({
+            type: 'CHECK_SIGNIFICANCE',
+            message: userMessage,
+            context: conversationHistory
+        }, (response) => {
+            if (response?.significant && response?.memory) {
+                console.log('✨ Memory created:', response.memory);
+                // Could show a notification here
+            }
         });
     }
 

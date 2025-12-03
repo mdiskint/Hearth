@@ -73,6 +73,11 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         return true;
     }
 
+    if (request.type === 'CHECK_SIGNIFICANCE') {
+        handleSignificanceCheck(request).then(sendResponse);
+        return true;
+    }
+
     if (request.type === 'UPDATE_HEARTH') {
         // Optional: handle manual updates or feedback
         return false;
@@ -115,4 +120,69 @@ async function handleGetContext(userMessage) {
         memories: memoriesResult.memories || [],
         heatMap: heatState
     };
+}
+
+async function handleSignificanceCheck(request) {
+    console.log('🔍 Checking significance for message:', request.message.substring(0, 50) + '...');
+
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+        console.log('⚠️ User not signed in, skipping memory extraction');
+        return { significant: false };
+    }
+
+    // Get API key from storage
+    const { apiKey, eos } = await chrome.storage.local.get(['apiKey', 'eos']);
+
+    if (!apiKey) {
+        console.log('⚠️ No API key set, skipping memory extraction');
+        return { significant: false };
+    }
+
+    try {
+        // Dynamic import of memory extractor
+        const { checkSignificance, extractMemory } = await import('./core/memoryExtractor.js');
+
+        const isSignificant = await checkSignificance(apiKey, request.message, request.context || []);
+        console.log('📊 Significance result:', isSignificant);
+
+        if (isSignificant) {
+            console.log('✨ Significant message detected, extracting memory...');
+            const memory = await extractMemory(apiKey, request.message, request.context || [], eos || '');
+
+            if (memory) {
+                console.log('💾 Memory extracted:', memory.summary);
+
+                // Save to Supabase
+                const { error } = await supabase.from('memories').insert({
+                    user_id: user.id,
+                    content: memory.content,
+                    summary: memory.summary,
+                    domains: memory.domains,
+                    emotions: memory.emotions,
+                    intensity: memory.intensity,
+                    source: 'extension'
+                });
+
+                if (error) {
+                    console.error('❌ Failed to save memory to Supabase:', error);
+                } else {
+                    console.log('✅ Memory saved to Supabase');
+
+                    // Reload memories
+                    await initializeHearth();
+
+                    return {
+                        significant: true,
+                        memory: memory.summary
+                    };
+                }
+            }
+        }
+
+        return { significant: isSignificant };
+    } catch (err) {
+        console.error('❌ Error in significance check:', err);
+        return { significant: false };
+    }
 }

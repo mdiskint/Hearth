@@ -14,6 +14,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 function showSettings(visible) {
     const display = visible ? 'block' : 'none';
+    document.getElementById('api-key-section').style.display = display;
     document.getElementById('main-settings').style.display = display;
     document.getElementById('memories-section').style.display = display;
     document.getElementById('baseline-section').style.display = display;
@@ -80,6 +81,30 @@ function renderAuth(user) {
 async function loadSettings(user) {
     // Load state from Supabase
     const { data: profile } = await supabase.from('profiles').select('*').eq('id', user.id).single();
+
+    // API Key
+    const { apiKey } = await chrome.storage.local.get('apiKey');
+    const apiKeyInput = document.getElementById('api-key-input');
+    const apiKeyStatus = document.getElementById('api-key-status');
+
+    if (apiKey) {
+        apiKeyInput.value = apiKey;
+        apiKeyStatus.textContent = '✅ API key set (for memory extraction)';
+        apiKeyStatus.style.color = '#22c55e';
+    }
+
+    document.getElementById('save-api-key').addEventListener('click', async () => {
+        const key = apiKeyInput.value.trim();
+        if (key) {
+            await chrome.storage.local.set({ apiKey: key });
+            apiKeyStatus.textContent = '✅ API key saved';
+            apiKeyStatus.style.color = '#22c55e';
+        } else {
+            await chrome.storage.local.remove('apiKey');
+            apiKeyStatus.textContent = 'API key removed';
+            apiKeyStatus.style.color = '#888';
+        }
+    });
 
     // EOS
     const eosInput = document.getElementById('eos-input');
