@@ -4,6 +4,7 @@
  */
 
 import { callClaude } from '../api/claude.js';
+import { db } from '../services/database';
 
 // Significance Detection Prompt (Fast/Cheap)
 const SIGNIFICANCE_PROMPT = `You detect personal significance in messages.
@@ -125,22 +126,26 @@ export async function extractLiveMemory(apiKey, userMessage, conversationHistory
 }
 
 /**
- * Save a memory to the memory store (append to memories.json)
+ * Save a memory to the memory store (Supabase + localStorage fallback)
  * @param {Object} memory - Memory object to save
+ * @param {string} userId - Optional user ID for cloud sync
  * @returns {Promise<boolean>} - Success status
  */
-export async function saveMemoryToStore(memory) {
+export async function saveMemoryToStore(memory, userId = null) {
     try {
-        // In a real implementation, this would:
-        // 1. Load existing memories.json
-        // 2. Append the new memory
-        // 3. Save back to file
-
-        // For now, we'll just log it and return success
-        // The actual file I/O would need a backend endpoint
         console.log('Memory saved:', memory);
 
-        // Store in localStorage as a fallback
+        // Save to Supabase if user is logged in
+        if (userId) {
+            try {
+                await db.addMemory(userId, memory);
+                console.log('Memory synced to cloud');
+            } catch (dbErr) {
+                console.error('Failed to sync memory to cloud:', dbErr);
+            }
+        }
+
+        // Store in localStorage as a fallback/cache
         const stored = JSON.parse(localStorage.getItem('liveMemories') || '[]');
         stored.push(memory);
         localStorage.setItem('liveMemories', JSON.stringify(stored));

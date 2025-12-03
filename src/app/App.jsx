@@ -1,13 +1,17 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { useAuth } from '../context/AuthContext';
+import AuthScreen from '../components/AuthScreen';
 import { Hearth } from '../core/Hearth.js';
 import { callClaude, buildSystemPrompt } from '../api/claude.js';
-import { checkSignificance, extractLiveMemory, saveMemoryToStore, getLiveMemories } from '../utils/liveMemory.js';
+import { db } from '../services/database';
+import { checkSignificance, extractLiveMemory, saveMemoryToStore, getLiveMemories, clearLiveMemories } from '../utils/liveMemory.js';
 import IntakeFlow from './IntakeFlow.jsx';
 
 // Initialize Hearth
 const hearth = new Hearth({ debug: false });
 
 function App() {
+  const { user, loading, signOut } = useAuth();
   const [messages, setMessages] = useState([]);
   const [conversationHistory, setConversationHistory] = useState([]);
   const [input, setInput] = useState('');
@@ -21,7 +25,9 @@ function App() {
   const [userEOS, setUserEOS] = useState(''); // User's EOS for context
 
   // Intake Flow State
-  const [showIntake, setShowIntake] = useState(true); // Default to showing intake for new users
+  const [showIntake, setShowIntake] = useState(false); // Check profile first
+  const [isProfileLoading, setIsProfileLoading] = useState(false);
+  const [hasCheckedProfile, setHasCheckedProfile] = useState(false);
 
   const messagesEndRef = useRef(null);
 
@@ -30,19 +36,93 @@ function App() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
+  // Load user data from cloud on login
+  useEffect(() => {
+    if (user) {
+      loadUserData();
+    }
+  }, [user]);
+
+  const loadUserData = async () => {
+    setIsProfileLoading(true);
+    try {
+      let hasData = false;
+
+      // 1. Check for local migration
+      const localMemories = getLiveMemories();
+      if (localMemories.length > 0) {
+        if (confirm('We found existing data in this browser. Import it to your cloud account?')) {
+          // Upload memories
+          for (const mem of localMemories) {
+            await saveMemoryToStore(mem, user.id);
+          }
+          // Clear local
+          clearLiveMemories();
+          hasData = true;
+        }
+      }
+
+      // 2. Load from Cloud
+      try {
+        const profile = await db.getProfile(user.id);
+        if (profile) {
+          if (profile.eos) {
+            setUserEOS(profile.eos);
+            hasData = true;
+          }
+          if (profile.heat_map) {
+            setHeatState(profile.heat_map);
+            if (hearth.heatTracker) {
+              hearth.heatTracker.import(profile.heat_map);
+            }
+            hasData = true;
+          }
+        }
+      } catch (profileErr) {
+        // Profile might not exist yet, ignore error
+        console.log('No profile found or error loading profile');
+      }
+
+      const memories = await db.getMemories(user.id);
+      if (memories && memories.length > 0) {
+        setLiveMemories(memories);
+        if (hearth.memoryRetriever) {
+          hearth.memoryRetriever.memories = memories;
+        }
+        hasData = true;
+      }
+
+      // If no data found, show intake
+      if (!hasData) {
+        setShowIntake(true);
+      }
+
+    } catch (err) {
+      console.error('Error loading user data:', err);
+      // Fallback to intake on general error
+      setShowIntake(true);
+    } finally {
+      setIsProfileLoading(false);
+      setHasCheckedProfile(true);
+    }
+  };
+
   // Handle completion of intake flow
   const handleIntakeComplete = async (data) => {
     console.log('Intake complete:', data);
 
     // 1. Save memories
     for (const memory of data.memories) {
-      await saveMemoryToStore(memory);
+      await saveMemoryToStore(memory, user?.id);
     }
     setLiveMemories(prev => [...prev, ...data.memories]);
 
     // 2. Save EOS if provided
     if (data.eos) {
       setUserEOS(data.eos);
+      if (user?.id) {
+        await db.saveEOS(user.id, data.eos);
+      }
       console.log('User EOS saved');
     }
 
@@ -92,6 +172,26 @@ function App() {
     setShowIntake(false);
   };
 
+  if (loading || (user && isProfileLoading)) {
+    return (
+      <div style={styles.loadingContainer}>
+        <div style={styles.loadingText}>{loading ? 'Loading Hearth...' : 'Loading Profile...'}</div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <AuthScreen />;
+  }
+
+  if (!hasCheckedProfile) {
+    return (
+      <div style={styles.loadingContainer}>
+        <div style={styles.loadingText}>Loading Profile...</div>
+      </div>
+    );
+  }
+
   if (showIntake) {
     return <IntakeFlow onComplete={handleIntakeComplete} />;
   }
@@ -113,6 +213,12 @@ function App() {
 
     // Update heat state
     setHeatState(result.heatMap);
+    if (user?.id) {
+      // Save updated heat map to cloud
+      // We get the full export from tracker to save
+      const fullState = hearth.heatTracker.export();
+      await db.saveHeatMap(user.id, fullState);
+    }
     setRetrievedMemories(result.memories);
 
     // Build new conversation history with this message
@@ -125,7 +231,7 @@ function App() {
           console.log('✨ Significant message detected, extracting memory...');
           const memory = await extractLiveMemory(apiKey, userMessage, conversationHistory, userEOS);
           if (memory) {
-            await saveMemoryToStore(memory);
+            await saveMemoryToStore(memory, user?.id);
             setLiveMemories(prev => [...prev, memory]);
 
             // Show notification
@@ -207,6 +313,12 @@ function App() {
 
   return (
     <div style={styles.container}>
+      {/* Beta Warning Banner */}
+      <div style={styles.betaBanner}>
+        <span>☁️</span>
+        <span>Beta — Your data syncs to the cloud. Sign in on any device to access your memories.</span>
+      </div>
+
       {/* Header */}
       <header style={styles.header}>
         <div style={styles.headerLeft}>
@@ -228,6 +340,9 @@ function App() {
 
         <button onClick={handleReset} style={styles.resetButton}>
           Reset Conversation
+        </button>
+        <button onClick={signOut} style={styles.signOutButton}>
+          Sign Out
         </button>
       </header>
 
@@ -624,6 +739,39 @@ const styles = {
   },
   notificationIcon: {
     fontSize: '18px',
+  },
+  loadingContainer: {
+    height: '100vh',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    background: '#0f0f0f',
+    color: '#e5e5e5',
+  },
+  loadingText: {
+    fontSize: '18px',
+    color: '#737373',
+  },
+  signOutButton: {
+    padding: '8px 16px',
+    background: 'none',
+    border: '1px solid #404040',
+    borderRadius: '6px',
+    color: '#737373',
+    cursor: 'pointer',
+    marginLeft: '8px',
+  },
+  betaBanner: {
+    background: 'rgba(255, 150, 50, 0.15)',
+    color: '#fdba74',
+    padding: '8px',
+    textAlign: 'center',
+    fontSize: '12px',
+    borderBottom: '1px solid rgba(255, 150, 50, 0.2)',
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: '8px',
   },
 };
 

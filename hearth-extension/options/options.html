@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <title>Hearth Settings</title>
+    <link rel="stylesheet" href="options.css">
+</head>
+
+<body>
+    <div class="container">
+        <h1>🔥 Hearth Settings</h1>
+
+        <section id="auth-section">
+            <!-- Auth UI injected here -->
+        </section>
+
+        <section id="main-settings" style="display: none;">
+            <h2>Your EOS (Emotional Operating System)</h2>
+            <p class="description">
+                Paste your communication preferences. This tells AI how to talk to you.
+                <a href="https://eos-app-seven.vercel.app" target="_blank">Create one here</a> if you don't have one.
+            </p>
+            <textarea id="eos-input" placeholder="Paste your EOS here..."></textarea>
+            <button id="save-eos" class="primary">Save EOS</button>
+        </section>
+
+        <section id="memories-section" style="display: none;">
+            <h2>Your Memories</h2>
+            <p class="description">
+                Hearth remembers significant moments from your conversations.
+            </p>
+            <div id="memories-list"></div>
+            <button id="clear-memories" class="danger">Clear All Memories</button>
+        </section>
+
+        <section id="baseline-section" style="display: none;">
+            <h2>Import Baseline</h2>
+            <p class="description">
+                Paste an extraction from your existing AI (Claude or ChatGPT) to bootstrap your memories.
+            </p>
+            <textarea id="baseline-input" placeholder="Paste extraction here..."></textarea>
+            <button id="import-baseline">Import</button>
+        </section>
+
+        <section id="heat-section" style="display: none;">
+            <h2>Heat Map</h2>
+            <div id="heat-map-full"></div>
+            <button id="reset-heat">Reset Heat Map</button>
+        </section>
+    </div>
+    <script type="module" src="options.js"></script>
+</body>
+
+</html>
