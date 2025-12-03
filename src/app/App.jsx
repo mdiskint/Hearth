@@ -45,13 +45,18 @@ function App() {
 
   const loadUserData = async () => {
     setIsProfileLoading(true);
+    console.log('🔄 loadUserData called for user:', user.id);
+
     try {
       let hasData = false;
 
       // 1. Check for local migration
       const localMemories = getLiveMemories();
+      console.log('📦 Local memories found:', localMemories.length);
+
       if (localMemories.length > 0) {
         if (confirm('We found existing data in this browser. Import it to your cloud account?')) {
+          console.log('⬆️ Uploading local memories to cloud...');
           // Upload memories
           for (const mem of localMemories) {
             await saveMemoryToStore(mem, user.id);
@@ -63,14 +68,19 @@ function App() {
       }
 
       // 2. Load from Cloud
+      console.log('☁️ Loading profile from Supabase...');
       try {
         const profile = await db.getProfile(user.id);
+        console.log('✅ Profile loaded:', profile);
+
         if (profile) {
           if (profile.eos) {
+            console.log('📝 EOS found in profile');
             setUserEOS(profile.eos);
             hasData = true;
           }
           if (profile.heat_map) {
+            console.log('🔥 Heat map found in profile');
             setHeatState(profile.heat_map);
             if (hearth.heatTracker) {
               hearth.heatTracker.import(profile.heat_map);
@@ -80,30 +90,51 @@ function App() {
         }
       } catch (profileErr) {
         // Profile might not exist yet, ignore error
-        console.log('No profile found or error loading profile');
+        console.log('⚠️ No profile found or error loading profile:', profileErr.message);
       }
 
+      console.log('💾 Fetching memories from Supabase for user:', user.id);
       const memories = await db.getMemories(user.id);
+      console.log('✅ Memories fetched:', memories?.length || 0, 'memories');
+      console.log('📋 Memory data:', memories);
+
       if (memories && memories.length > 0) {
+        console.log('✨ Setting memories in state...');
         setLiveMemories(memories);
+
         if (hearth.memoryRetriever) {
+          console.log('🧠 Updating Hearth memoryRetriever with', memories.length, 'memories');
           hearth.memoryRetriever.memories = memories;
+        } else {
+          console.warn('⚠️ hearth.memoryRetriever not available!');
         }
+
         hasData = true;
+      } else {
+        console.log('📭 No memories found in Supabase');
+        // Still set empty array to initialize state
+        setLiveMemories([]);
+        if (hearth.memoryRetriever) {
+          hearth.memoryRetriever.memories = [];
+        }
       }
 
       // If no data found, show intake
       if (!hasData) {
+        console.log('🆕 No user data found, showing intake flow');
         setShowIntake(true);
+      } else {
+        console.log('✅ User has data, proceeding to main app');
       }
 
     } catch (err) {
-      console.error('Error loading user data:', err);
+      console.error('❌ Error loading user data:', err);
       // Fallback to intake on general error
       setShowIntake(true);
     } finally {
       setIsProfileLoading(false);
       setHasCheckedProfile(true);
+      console.log('✅ loadUserData complete');
     }
   };
 
