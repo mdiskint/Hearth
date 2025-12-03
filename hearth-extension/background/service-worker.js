@@ -141,7 +141,7 @@ async function handleSignificanceCheck(request) {
 
     try {
         // Dynamic import of memory extractor
-        const { checkSignificance, extractMemory } = await import('./core/memoryExtractor.js');
+        const { checkSignificance, extractMemory } = await import('../core/memoryExtractor.js');
 
         const isSignificant = await checkSignificance(apiKey, request.message, request.context || []);
         console.log('📊 Significance result:', isSignificant);
