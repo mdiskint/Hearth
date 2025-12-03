@@ -13,7 +13,7 @@ export class MemoryRetriever {
   constructor(heatTracker, config = {}) {
     this.heatTracker = heatTracker;
     this.memories = memoriesData.memories;
-    
+
     this.config = {
       maxTotalMemories: 10,       // Max memories to inject
       minHeatForRetrieval: 0.1,   // Minimum heat to trigger retrieval
@@ -28,15 +28,15 @@ export class MemoryRetriever {
    */
   retrieve() {
     const activeState = this.heatTracker.getActive(this.config.minHeatForRetrieval);
-    
+
     // Even with no active dimensions, return high-intensity foundational memories
     if (activeState.domains.length === 0 && activeState.emotions.length === 0) {
       const fallbackMemories = this._getFallbackMemories(2);
       const context = this._buildContext(fallbackMemories, activeState);
-      return { 
-        memories: fallbackMemories, 
-        context, 
-        meta: { reason: 'fallback_no_dimensions', memoriesRetrieved: fallbackMemories.length } 
+      return {
+        memories: fallbackMemories,
+        context,
+        meta: { reason: 'fallback_no_dimensions', memoriesRetrieved: fallbackMemories.length }
       };
     }
 
@@ -103,7 +103,7 @@ export class MemoryRetriever {
    */
   _scoreMemory(memory, activeState) {
     let score = 0;
-    
+
     // Score based on domain overlap
     for (const domain of memory.domains || []) {
       const activeDomain = activeState.domains.find(d => d.name === domain);
@@ -111,7 +111,7 @@ export class MemoryRetriever {
         score += activeDomain.heat * this.config.heatWeight;
       }
     }
-    
+
     // Score based on emotion overlap
     for (const emotion of memory.emotions || []) {
       const activeEmotion = activeState.emotions.find(e => e.name === emotion);
@@ -119,16 +119,16 @@ export class MemoryRetriever {
         score += activeEmotion.heat * this.config.heatWeight;
       }
     }
-    
+
     // Boost by memory intensity
     score += (memory.intensity || 0.5) * this.config.intensityWeight;
-    
+
     // Apply depth filtering based on heat
     const depth = this._getDepthForMemory(memory, activeState);
     if (!depth.allowed) {
       return 0; // Memory is too deep for current heat level
     }
-    
+
     return score;
   }
 
@@ -138,34 +138,31 @@ export class MemoryRetriever {
   _getDepthForMemory(memory, activeState) {
     // Get the highest heat among matching dimensions
     let maxHeat = 0;
-    
+
     for (const domain of memory.domains || []) {
       const match = activeState.domains.find(d => d.name === domain);
       if (match) maxHeat = Math.max(maxHeat, match.heat);
     }
-    
+
     for (const emotion of memory.emotions || []) {
       const match = activeState.emotions.find(e => e.name === emotion);
       if (match) maxHeat = Math.max(maxHeat, match.heat);
     }
-    
+
     // Determine allowed age based on heat
     const memoryAge = this._getMemoryAgeInDays(memory);
-    
-    if (maxHeat >= 0.7) {
-      // Hot: retrieve everything
+
+    if (maxHeat >= 0.6) {
+      // High Heat (>60%): Full access - foundational memories, deep history
       return { allowed: true, reason: 'hot' };
-    } else if (maxHeat >= 0.4) {
-      // Warm: last 90 days
+    } else if (maxHeat >= 0.3) {
+      // Medium Heat (30-60%): Retrieve more memories, including older ones (last 90 days)
       return { allowed: memoryAge <= 90, reason: 'warm' };
-    } else if (maxHeat >= 0.1) {
-      // Cool: last 30 days
-      return { allowed: memoryAge <= 30, reason: 'cool' };
     } else if (maxHeat > 0) {
-      // Cold but touched: last 14 days, high intensity only
-      return { allowed: memoryAge <= 14 && (memory.intensity || 0) >= 0.7, reason: 'cold' };
+      // Low Heat (0-30%): Only retrieve recent, surface-level memories (last 30 days)
+      return { allowed: memoryAge <= 30, reason: 'cool' };
     }
-    
+
     return { allowed: false, reason: 'none' };
   }
 
@@ -191,7 +188,7 @@ export class MemoryRetriever {
     // Build a natural-language context block
     let context = '<relevant_context>\n';
     context += 'The following memories are relevant to this conversation:\n\n';
-    
+
     // Group by primary theme
     const byDomain = {};
     for (const memory of memories) {
@@ -201,7 +198,7 @@ export class MemoryRetriever {
       }
       byDomain[primaryDomain].push(memory);
     }
-    
+
     for (const [domain, domainMemories] of Object.entries(byDomain)) {
       context += `[${domain}]\n`;
       for (const memory of domainMemories) {
@@ -209,7 +206,7 @@ export class MemoryRetriever {
       }
       context += '\n';
     }
-    
+
     // Add active dimension context
     const hotDomains = activeState.domains
       .filter(d => d.heat >= 0.7)
@@ -217,15 +214,15 @@ export class MemoryRetriever {
     const hotEmotions = activeState.emotions
       .filter(e => e.heat >= 0.7)
       .map(e => e.name);
-    
+
     if (hotDomains.length > 0 || hotEmotions.length > 0) {
       context += 'This conversation is particularly focused on: ';
       const focuses = [...hotDomains, ...hotEmotions];
       context += focuses.join(', ') + '.\n';
     }
-    
+
     context += '</relevant_context>';
-    
+
     return context;
   }
 
@@ -234,8 +231,8 @@ export class MemoryRetriever {
    */
   getMemoriesForDimension(dimensionName, limit = 5) {
     return this.memories
-      .filter(m => 
-        (m.domains || []).includes(dimensionName) || 
+      .filter(m =>
+        (m.domains || []).includes(dimensionName) ||
         (m.emotions || []).includes(dimensionName)
       )
       .sort((a, b) => (b.intensity || 0) - (a.intensity || 0))
@@ -248,7 +245,7 @@ export class MemoryRetriever {
   getStats() {
     const domainCounts = {};
     const emotionCounts = {};
-    
+
     for (const memory of this.memories) {
       for (const domain of memory.domains || []) {
         domainCounts[domain] = (domainCounts[domain] || 0) + 1;
@@ -257,7 +254,7 @@ export class MemoryRetriever {
         emotionCounts[emotion] = (emotionCounts[emotion] || 0) + 1;
       }
     }
-    
+
     return {
       totalMemories: this.memories.length,
       byDomain: domainCounts,

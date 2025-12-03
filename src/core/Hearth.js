@@ -28,12 +28,43 @@ export class Hearth {
     this.heatTracker = new HeatTracker(config.heatConfig);
     this.detector = new DimensionDetector(config.detectorConfig);
     this.retriever = new MemoryRetriever(this.heatTracker, config.retrieverConfig);
-    
+
     // Optional: Anthropic client for AI-powered detection
     this.anthropicClient = config.anthropicClient || null;
-    
+
     // Conversation history for context
     this.conversationHistory = [];
+
+    // Initialize heat tracker with existing memories
+    this.initializeFromMemories();
+  }
+
+  /**
+   * Initialize heat tracker from existing memories
+   * This "primes" the heat map with the user's memory profile
+   */
+  initializeFromMemories() {
+    const memories = this.retriever.memories;
+
+    if (!memories || memories.length === 0) {
+      return;
+    }
+
+    // Activate heat for each memory's dimensions
+    for (const memory of memories) {
+      if (memory.domains && memory.emotions) {
+        this.heatTracker.activate(
+          memory.domains,
+          memory.emotions,
+          memory.intensity || 0.5
+        );
+      }
+    }
+
+    if (this.config.debug) {
+      console.log(`[Hearth] Initialized with ${memories.length} memories`);
+      console.log(this.heatTracker.visualize());
+    }
   }
 
   /**
@@ -55,13 +86,13 @@ export class Hearth {
     // Step 2: Update heat tracker with detected dimensions
     const activatedDomains = detection.domains.map(d => d.name);
     const activatedEmotions = detection.emotions.map(e => e.name);
-    
+
     // Calculate average intensity from detection scores
     const avgIntensity = [
       ...detection.domains.map(d => d.score),
       ...detection.emotions.map(e => e.score)
-    ].reduce((sum, s) => sum + s, 0) / 
-    Math.max(detection.domains.length + detection.emotions.length, 1);
+    ].reduce((sum, s) => sum + s, 0) /
+      Math.max(detection.domains.length + detection.emotions.length, 1);
 
     this.heatTracker.activate(activatedDomains, activatedEmotions, avgIntensity);
 
@@ -120,21 +151,21 @@ export class Hearth {
    */
   getConversationSummary() {
     const state = this.heatTracker.getState();
-    
+
     // Find what ran hot
     const hotDomains = Object.entries(state.domains)
       .filter(([_, data]) => data.status === 'hot')
       .map(([name, _]) => name);
-    
+
     const hotEmotions = Object.entries(state.emotions)
       .filter(([_, data]) => data.status === 'hot')
       .map(([name, _]) => name);
-    
+
     // Find what was touched but cooled
     const touchedDomains = Object.entries(state.domains)
       .filter(([_, data]) => data.heat > 0 && data.status !== 'hot')
       .map(([name, _]) => name);
-    
+
     const touchedEmotions = Object.entries(state.emotions)
       .filter(([_, data]) => data.heat > 0 && data.status !== 'hot')
       .map(([name, _]) => name);
@@ -154,26 +185,26 @@ export class Hearth {
    */
   _generateNaturalSummary(hotDomains, hotEmotions, touchedDomains, touchedEmotions) {
     let summary = 'This conversation ';
-    
+
     if (hotDomains.length > 0 || hotEmotions.length > 0) {
       summary += 'was primarily about ';
       const hot = [...hotDomains, ...hotEmotions];
       summary += hot.join(' and ');
       summary += '. ';
     }
-    
+
     if (touchedDomains.length > 0 || touchedEmotions.length > 0) {
       summary += 'It also touched on ';
       const touched = [...touchedDomains, ...touchedEmotions];
       summary += touched.join(', ');
       summary += '.';
     }
-    
-    if (hotDomains.length === 0 && hotEmotions.length === 0 && 
-        touchedDomains.length === 0 && touchedEmotions.length === 0) {
+
+    if (hotDomains.length === 0 && hotEmotions.length === 0 &&
+      touchedDomains.length === 0 && touchedEmotions.length === 0) {
       summary = 'This conversation has just started.';
     }
-    
+
     return summary;
   }
 

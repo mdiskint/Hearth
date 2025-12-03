@@ -1,0 +1,195 @@
+[
+  {
+    "uuid": "test-conversation-001",
+    "name": "Life and Work Discussion",
+    "summary": "Personal conversation covering life decisions, family, and some project work",
+    "created_at": "2025-11-15T10:00:00.000000+00:00",
+    "updated_at": "2025-11-15T12:30:00.000000+00:00",
+    "chat_messages": [
+      {
+        "sender": "human",
+        "text": "Hey, I need to talk through some stuff. Big things happening."
+      },
+      {
+        "sender": "assistant",
+        "text": "I'm here. What's going on?"
+      },
+      {
+        "sender": "human",
+        "text": "We lost our house in the Eaton fire. Like, completely gone. We're in a rental now but it's been rough on everyone, especially the kids."
+      },
+      {
+        "sender": "assistant",
+        "text": "I'm so sorry. That's devastating. How are you holding up? And how old are your kids?"
+      },
+      {
+        "sender": "human",
+        "text": "They're 11 and 9. Both neurodivergent, which makes transitions even harder. Some days they're okay, other days they're a mess. The place we're renting has bad memories attached to it now - all the trauma after the fire happened here."
+      },
+      {
+        "sender": "assistant",
+        "text": "That's a lot of weight. The physical loss plus trying to help your kids process it while you're processing it yourself."
+      },
+      {
+        "sender": "human",
+        "text": "Yeah. Which is why we're thinking about moving. Not just to another place in LA - back to Marin. Where I grew up. It would be a homecoming for me."
+      },
+      {
+        "sender": "assistant",
+        "text": "That's a big decision. How does your wife feel about it?"
+      },
+      {
+        "sender": "human",
+        "text": "She's on board. We're aligned. The kids have mixed feelings - some days they want to go, other days they can't imagine leaving their friends. But my wife and I agreed that waiting a few more years would be purgatory, not patience."
+      },
+      {
+        "sender": "assistant",
+        "text": "That's a powerful way to put it. Purgatory versus patience."
+      },
+      {
+        "sender": "human",
+        "text": "Can you help me with something technical? I'm trying to set up an API endpoint and getting a 403 error."
+      },
+      {
+        "sender": "assistant",
+        "text": "Sure, a 403 usually means authentication or permissions. Are you passing the right headers? Can you show me the request?"
+      },
+      {
+        "sender": "human",
+        "text": "Never mind, I figured it out. Wrong API key. Anyway - back to the life stuff. Here's the thing. I'm forty-five. This might be my last real window to build something that matters."
+      },
+      {
+        "sender": "assistant",
+        "text": "What do you mean by last window?"
+      },
+      {
+        "sender": "human",
+        "text": "I'm in this phase of hyper-ambition. The kids are getting older, I have some financial stability, and I feel like if I don't take big swings now, when will I? I'm not trying to get rich - I'm trying to make a dent. Leave something behind."
+      },
+      {
+        "sender": "assistant",
+        "text": "That urgency sounds real but not desperate. More like clarity."
+      },
+      {
+        "sender": "human",
+        "text": "Exactly. I've spent forty years in a fog. Got diagnosed with ADHD at 40 and suddenly everything made sense. Why I struggled, why certain things were so hard. Now I feel clear for the first time."
+      },
+      {
+        "sender": "assistant",
+        "text": "That's a profound shift. Decades of wondering what was wrong, then finally having a framework."
+      },
+      {
+        "sender": "human",
+        "text": "And I have aphantasia too. Can't visualize anything. No pictures in my head. I build everything with words. That's why I work the way I do - I'm a vibe coder. I have the creative vision but I need AI to help me execute technically."
+      },
+      {
+        "sender": "assistant",
+        "text": "That actually explains a lot about how you approach problems. You think in language and relationships, not images."
+      },
+      {
+        "sender": "human",
+        "text": "Right. So here's the complicated part. I'm in law school. Third year. And I don't want to practice law."
+      },
+      {
+        "sender": "assistant",
+        "text": "Have you told anyone?"
+      },
+      {
+        "sender": "human",
+        "text": "My wife doesn't know yet. I mean, she probably senses it. But we haven't had the real conversation. I'm going to finish the degree - there's a lot you can do with it besides being a lawyer. But I'm not going to be a lawyer."
+      },
+      {
+        "sender": "assistant",
+        "text": "That's a big thing to be carrying. The gap between where you're headed and what you've told the people closest to you."
+      },
+      {
+        "sender": "human",
+        "text": "Yeah. I need to have that conversation soon. She'll be supportive, I think. We're partners. But it's still hard to say out loud."
+      },
+      {
+        "sender": "assistant", 
+        "text": "What do you want instead? If not law?"
+      },
+      {
+        "sender": "human",
+        "text": "I want to create. I want to be my own boss. I write - fiction, music, theater. I'm working on a novel, actually. 80,000 words so far. And I've got these app ideas. The thing I crave is emergence - that moment when two ideas suddenly create a third idea from nothing. That's what I live for."
+      },
+      {
+        "sender": "assistant",
+        "text": "So creative work is the center. The law degree is a tool, not the destination."
+      },
+      {
+        "sender": "human",
+        "text": "Exactly. Hey, quick question - how do I center a div in CSS? I can never remember."
+      },
+      {
+        "sender": "assistant",
+        "text": "Flexbox is easiest: display: flex; justify-content: center; align-items: center; on the parent."
+      },
+      {
+        "sender": "human",
+        "text": "Thanks. Okay, one more heavy thing. I've been experimenting with psychedelics. Discovered something weird - I'm on Abilify for anxiety, and it lets me stay conscious during trips. Like I'm present the whole time instead of losing myself."
+      },
+      {
+        "sender": "assistant",
+        "text": "That's an unusual interaction. Most people report antipsychotics blunting psychedelic effects entirely."
+      },
+      {
+        "sender": "human",
+        "text": "Right? It's like I get the insight without the ego dissolution. I can observe and integrate in real-time. It's been genuinely therapeutic."
+      },
+      {
+        "sender": "assistant",
+        "text": "Have you talked to your prescriber about it?"
+      },
+      {
+        "sender": "human",
+        "text": "Not yet. That's another conversation I need to have. Lots of conversations I need to have apparently."
+      },
+      {
+        "sender": "assistant",
+        "text": "Sounds like you're in a period of truth-telling. To yourself first, then to the people around you."
+      },
+      {
+        "sender": "human",
+        "text": "That's exactly right. Forty-five years of fog, now clarity. Time to live like I mean it."
+      },
+      {
+        "sender": "assistant",
+        "text": "What's the first move?"
+      },
+      {
+        "sender": "human",
+        "text": "Marin. We made a backup offer on a house. If it goes through, we're going. Fresh start. Homecoming. Getting away from the ashes - literally."
+      },
+      {
+        "sender": "assistant",
+        "text": "That's not running away. That's running toward."
+      },
+      {
+        "sender": "human",
+        "text": "Yeah. I think so too. Thanks for listening to all this. I needed to say it out loud."
+      },
+      {
+        "sender": "assistant",
+        "text": "Anytime. This is the stuff that matters."
+      },
+      {
+        "sender": "human",
+        "text": "Can you help me debug this React component? It's not rendering."
+      },
+      {
+        "sender": "assistant",
+        "text": "Sure, paste the code and any error messages."
+      },
+      {
+        "sender": "human",
+        "text": "Actually forget it, I need to go pick up the kids. Talk later."
+      },
+      {
+        "sender": "assistant",
+        "text": "Go be with your family. We can debug anytime."
+      }
+    ]
+  }
+]
