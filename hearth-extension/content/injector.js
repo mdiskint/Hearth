@@ -214,10 +214,31 @@
     async function getHearthContext(userMessage) {
         // Send message to background script to get Hearth context
         return new Promise((resolve) => {
-            chrome.runtime.sendMessage(
-                { type: 'GET_HEARTH_CONTEXT', message: userMessage },
-                (response) => resolve(response)
-            );
+            try {
+                // Check if extension context is still valid
+                if (!chrome.runtime?.id) {
+                    console.warn('⚠️ Extension context invalidated. Please reload the page.');
+                    resolve({ eos: null, memories: [], heatMap: null });
+                    return;
+                }
+
+                chrome.runtime.sendMessage(
+                    { type: 'GET_HEARTH_CONTEXT', message: userMessage },
+                    (response) => {
+                        // Check for errors (like extension reload)
+                        if (chrome.runtime.lastError) {
+                            console.warn('⚠️ Extension error:', chrome.runtime.lastError.message);
+                            console.warn('💡 Tip: Reload this page after updating the extension');
+                            resolve({ eos: null, memories: [], heatMap: null });
+                            return;
+                        }
+                        resolve(response);
+                    }
+                );
+            } catch (err) {
+                console.error('❌ Error getting Hearth context:', err);
+                resolve({ eos: null, memories: [], heatMap: null });
+            }
         });
     }
 
@@ -254,6 +275,12 @@
     let conversationHistory = [];
 
     function updateHearth(userMessage, hearthContext) {
+        // Check if extension context is still valid
+        if (!chrome.runtime?.id) {
+            console.warn('⚠️ Extension context invalidated, skipping Hearth update');
+            return;
+        }
+
         // Add to conversation history
         conversationHistory.push({
             role: 'user',
@@ -266,23 +293,34 @@
         }
 
         // Send to background for heat map update
-        chrome.runtime.sendMessage({
-            type: 'UPDATE_HEARTH',
-            message: userMessage,
-            context: hearthContext
-        });
+        try {
+            chrome.runtime.sendMessage({
+                type: 'UPDATE_HEARTH',
+                message: userMessage,
+                context: hearthContext
+            });
+        } catch (err) {
+            console.warn('⚠️ Could not update heat map:', err.message);
+        }
 
         // Check significance and extract memory in background
-        chrome.runtime.sendMessage({
-            type: 'CHECK_SIGNIFICANCE',
-            message: userMessage,
-            context: conversationHistory
-        }, (response) => {
-            if (response?.significant && response?.memory) {
-                console.log('✨ Memory created:', response.memory);
-                // Could show a notification here
-            }
-        });
+        try {
+            chrome.runtime.sendMessage({
+                type: 'CHECK_SIGNIFICANCE',
+                message: userMessage,
+                context: conversationHistory
+            }, (response) => {
+                if (chrome.runtime.lastError) {
+                    // Silently ignore if extension was reloaded
+                    return;
+                }
+                if (response?.significant && response?.memory) {
+                    console.log('✨ Memory created:', response.memory);
+                }
+            });
+        } catch (err) {
+            console.warn('⚠️ Could not check significance:', err.message);
+        }
     }
 
 })();
