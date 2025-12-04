@@ -3,6 +3,88 @@
 (async function () {
     'use strict';
 
+    // Store the latest hearth context globally for fetch interceptor
+    let latestHearthContext = null;
+
+    // Intercept fetch to inject context at network level (invisible to user)
+    const originalFetch = window.fetch;
+    window.fetch = async function (...args) {
+        const [url, options] = args;
+
+        // Check if this is a Claude API conversation request
+        if (typeof url === 'string' && url.includes('/api/') && options?.method === 'POST') {
+            console.log('🌐 Intercepted POST request to:', url);
+
+            try {
+                // Try to parse the request body
+                if (options.body && latestHearthContext) {
+                    const bodyStr = typeof options.body === 'string' ? options.body : await options.body.text();
+                    let bodyData = JSON.parse(bodyStr);
+
+                    console.log('📦 Original request body:', bodyData);
+
+                    // Find the user message in the request (Claude's format may vary)
+                    // Common patterns: { prompt: "..." }, { messages: [{ content: "..." }] }
+                    let modified = false;
+
+                    if (bodyData.prompt && typeof bodyData.prompt === 'string') {
+                        // Single prompt field
+                        const contextBlock = buildHearthContextBlock(latestHearthContext);
+                        bodyData.prompt = contextBlock + '\n\n' + bodyData.prompt;
+                        modified = true;
+                        console.log('✅ Injected context into prompt field');
+                    } else if (bodyData.messages && Array.isArray(bodyData.messages)) {
+                        // Messages array (last user message)
+                        for (let i = bodyData.messages.length - 1; i >= 0; i--) {
+                            if (bodyData.messages[i].role === 'user') {
+                                const contextBlock = buildHearthContextBlock(latestHearthContext);
+                                bodyData.messages[i].content = contextBlock + '\n\n' + bodyData.messages[i].content;
+                                modified = true;
+                                console.log('✅ Injected context into messages array');
+                                break;
+                            }
+                        }
+                    }
+
+                    if (modified) {
+                        // Modify the request with the new body
+                        options.body = JSON.stringify(bodyData);
+                        console.log('📤 Sending modified request with context');
+                    }
+                }
+            } catch (err) {
+                console.warn('⚠️ Error modifying request body:', err);
+                // If parsing fails, send original request
+            }
+        }
+
+        // Call original fetch
+        return originalFetch.apply(this, args);
+    };
+
+    function buildHearthContextBlock(hearthContext) {
+        if (!hearthContext || (!hearthContext.eos && !hearthContext.memories?.length)) {
+            return '';
+        }
+
+        let contextBlock = '<hearth_context>\n';
+
+        if (hearthContext.eos) {
+            contextBlock += `<communication_preferences>\n${hearthContext.eos}\n</communication_preferences>\n\n`;
+        }
+
+        if (hearthContext.memories?.length > 0) {
+            contextBlock += '<relevant_memories>\n';
+            hearthContext.memories.forEach(m => {
+                contextBlock += `- ${m.content}\n`;
+            });
+            contextBlock += '</relevant_memories>\n';
+        }
+
+        contextBlock += '</hearth_context>';
+        return contextBlock;
+    }
+
     // Detect platform
     const platform = detectPlatform();
     if (!platform) return;
@@ -207,22 +289,19 @@
         const hearthContext = await getHearthContext(userMessage);
         console.log('📦 Hearth context received:', hearthContext);
 
-        // Build enriched message
-        const enrichedMessage = buildEnrichedMessage(userMessage, hearthContext);
-        console.log('✨ Enriched message:', enrichedMessage !== userMessage ? 'YES (added context)' : 'NO (no context to add)');
+        // Store context globally for fetch interceptor to use
+        latestHearthContext = hearthContext;
+        console.log('✅ Stored context for network interception');
 
-        // Set the enriched message
-        if (enrichedMessage !== userMessage) {
-            console.log('📝 Setting enriched message in textarea...');
-            setMessageText(textarea, enrichedMessage, platform);
-        }
+        // DO NOT modify the textarea - let fetch interceptor handle injection
+        // The user's message stays clean in the UI
 
-        // Trigger the actual send
-        console.log('▶️ Triggering callback to send message...');
+        // Trigger the actual send (fetch interceptor will modify the network request)
+        console.log('▶️ Triggering send... (fetch interceptor will inject context)');
         triggerCallback();
 
-        // Update heat map and check for crystallization (async, don't block)
-        console.log('🔄 Calling updateHearth...');
+        // Update heat map and check for memory extraction (async, don't block)
+        console.log('🔄 Calling updateHearth for memory extraction...');
         updateHearth(userMessage, hearthContext);
     }
 
