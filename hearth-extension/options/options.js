@@ -1,4 +1,5 @@
 import { supabase } from '../lib/supabase-bundle.js';
+import { enrichMemoryMetadata } from '../core/memoryExtractor.js';
 
 document.addEventListener('DOMContentLoaded', async () => {
     const { data: { user } } = await supabase.auth.getUser();
@@ -139,40 +140,120 @@ async function loadSettings(user) {
         }
     });
 
-    // Import Baseline
+    // Import Baseline (JSON)
     document.getElementById('import-baseline').addEventListener('click', async () => {
         const text = document.getElementById('baseline-input').value;
+        const status = document.getElementById('import-status');
         if (!text) return;
 
-        const memories = [];
-        const memoryBlocks = text.split(/MEMORY:\s*/i).slice(1);
-        memoryBlocks.forEach(block => {
-            if (block.includes('BASELINE HEAT MAP:')) block = block.split('BASELINE HEAT MAP:')[0];
-            const contentMatch = block.match(/^(.+?)(?=\n(?:DOMAINS|EMOTIONS|INTENSITY):)/s);
-            if (contentMatch) {
-                memories.push({
-                    content: contentMatch[1].trim(),
-                    created: new Date().toISOString(),
-                    source: 'imported_baseline'
-                });
-            }
-        });
+        try {
+            status.textContent = 'Parsing...';
+            let memories = [];
 
-        if (memories.length > 0) {
-            for (const mem of memories) {
-                await supabase.from('memories').insert({
-                    user_id: user.id,
-                    content: mem.content,
-                    domains: [],
-                    emotions: [],
-                    intensity: 0.5
+            // Try parsing JSON first
+            try {
+                const json = JSON.parse(text);
+                if (json.memories && Array.isArray(json.memories)) {
+                    memories = json.memories;
+                } else if (Array.isArray(json)) {
+                    memories = json;
+                }
+            } catch (e) {
+                // Fallback to text parsing if JSON fails
+                console.log('JSON parse failed, trying text format');
+                const memoryBlocks = text.split(/MEMORY:\s*/i).slice(1);
+                memoryBlocks.forEach(block => {
+                    if (block.includes('BASELINE HEAT MAP:')) block = block.split('BASELINE HEAT MAP:')[0];
+                    const contentMatch = block.match(/^(.+?)(?=\n(?:DOMAINS|EMOTIONS|INTENSITY):)/s);
+                    if (contentMatch) {
+                        memories.push({
+                            content: contentMatch[1].trim(),
+                            domains: [], emotions: [], intensity: 0.5
+                        });
+                    }
                 });
             }
-            alert(`Imported ${memories.length} memories.`);
-            window.location.reload();
-        } else {
-            alert('No memories found.');
+
+            if (memories.length > 0) {
+                status.textContent = `Importing ${memories.length} memories...`;
+                let count = 0;
+
+                for (const mem of memories) {
+                    await supabase.from('memories').insert({
+                        user_id: user.id,
+                        content: mem.content,
+                        domains: mem.domains || [],
+                        emotions: mem.emotions || [],
+                        intensity: mem.intensity || 0.5,
+                        source: 'import_json'
+                    });
+                    count++;
+                    status.textContent = `Importing ${count}/${memories.length}...`;
+                }
+
+                status.textContent = `✅ Successfully imported ${count} memories!`;
+                setTimeout(() => window.location.reload(), 1500);
+            } else {
+                status.textContent = '❌ No memories found in input.';
+            }
+        } catch (err) {
+            console.error(err);
+            status.textContent = '❌ Error: ' + err.message;
         }
+    });
+
+    // Enrich Memories
+    document.getElementById('enrich-memories').addEventListener('click', async () => {
+        const status = document.getElementById('import-status');
+        const { apiKey } = await chrome.storage.local.get('apiKey');
+
+        if (!apiKey) {
+            alert('Please set your Anthropic API Key first!');
+            return;
+        }
+
+        if (!confirm('This will scan all your memories and use Claude to add missing metadata (domains, emotions). Continue?')) return;
+
+        status.textContent = 'Fetching memories...';
+
+        const { data: memories } = await supabase
+            .from('memories')
+            .select('*')
+            .eq('user_id', user.id);
+
+        const toEnrich = memories.filter(m =>
+            !m.domains || m.domains.length === 0 ||
+            !m.emotions || m.emotions.length === 0
+        );
+
+        if (toEnrich.length === 0) {
+            status.textContent = '✅ All memories are already enriched!';
+            return;
+        }
+
+        status.textContent = `Found ${toEnrich.length} memories to enrich...`;
+
+        let count = 0;
+        for (const mem of toEnrich) {
+            count++;
+            status.textContent = `Enriching ${count}/${toEnrich.length}: "${mem.content.substring(0, 20)}..."`;
+
+            const metadata = await enrichMemoryMetadata(apiKey, mem.content);
+
+            if (metadata) {
+                await supabase.from('memories').update({
+                    domains: metadata.domains,
+                    emotions: metadata.emotions,
+                    intensity: metadata.intensity
+                }).eq('id', mem.id);
+            }
+
+            // Rate limit pause
+            await new Promise(r => setTimeout(r, 500));
+        }
+
+        status.textContent = `✅ Enriched ${count} memories! Reloading...`;
+        setTimeout(() => window.location.reload(), 1500);
     });
 }
 

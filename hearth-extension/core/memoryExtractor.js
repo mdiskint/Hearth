@@ -137,3 +137,42 @@ export async function extractMemory(apiKey, userMessage, conversationContext = [
         return null;
     }
 }
+/**
+ * Enrich an existing memory with metadata
+ */
+export async function enrichMemoryMetadata(apiKey, memoryContent) {
+    try {
+        const prompt = `Analyze this memory and assign metadata.
+
+**MEMORY:**
+"${memoryContent}"
+
+**TASK:**
+Assign domains, emotions, and intensity (0.0-1.0).
+
+**DOMAINS:** Work, Relationships, Creative, Self, Decisions, Resources
+**EMOTIONS:** Fear, Anger, Shame, Grief, Anxiety, Joy, Pride, Love, Curiosity, Peace
+
+**OUTPUT JSON:**
+{
+  "domains": ["..."],
+  "emotions": ["..."],
+  "intensity": 0.8
+}
+
+Output ONLY valid JSON.`;
+
+        const response = await callClaude(apiKey, 'You are a psychological analyzer.', [{
+            role: 'user',
+            content: prompt
+        }], 'claude-3-haiku-20240307');
+
+        const jsonMatch = response.match(/\{[\s\S]*\}/);
+        if (!jsonMatch) return null;
+
+        return JSON.parse(jsonMatch[0]);
+    } catch (err) {
+        console.error('❌ Enrichment error:', err);
+        return null;
+    }
+}

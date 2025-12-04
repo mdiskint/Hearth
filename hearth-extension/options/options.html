@@ -47,12 +47,17 @@
         </section>
 
         <section id="baseline-section" style="display: none;">
-            <h2>Import Baseline</h2>
+            <h2>Import Memories (JSON)</h2>
             <p class="description">
-                Paste an extraction from your existing AI (Claude or ChatGPT) to bootstrap your memories.
+                Import memories from a JSON file or text. Format:
+                <code>{ "memories": [{ "content": "...", "domains": [...], ... }] }</code>
             </p>
-            <textarea id="baseline-input" placeholder="Paste extraction here..."></textarea>
-            <button id="import-baseline">Import</button>
+            <textarea id="baseline-input" placeholder='{ "memories": [...] }'></textarea>
+            <div style="display: flex; gap: 10px; margin-top: 10px;">
+                <button id="import-baseline">Import JSON</button>
+                <button id="enrich-memories" class="secondary">✨ Enrich Existing Memories</button>
+            </div>
+            <p id="import-status" style="margin-top: 8px; font-size: 12px; color: #888;"></p>
         </section>
 
         <section id="heat-section" style="display: none;">
