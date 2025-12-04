@@ -78,10 +78,18 @@
     }
 
     function interceptMessages(platform, config) {
+        console.log('🎣 Setting up message interception for', platform);
+        console.log('🎯 Send button selector:', config.sendButton);
+        console.log('🎯 Textarea selector:', config.textarea);
+
         // Watch for send button clicks
         document.addEventListener('click', async (e) => {
+            console.log('👆 Click detected on:', e.target);
             const sendButton = e.target.closest(config.sendButton);
+            console.log('🔍 Matched send button?', !!sendButton, sendButton);
+
             if (sendButton) {
+                console.log('✅ Send button clicked!');
                 // We need to capture the click, inject, then let it proceed or re-trigger
                 // But for React apps, modifying the DOM value directly often doesn't update the internal state.
                 // We'll try to intercept, modify, and then trigger the send.
@@ -99,15 +107,18 @@
 
                 if (sendButton.dataset.hearthProcessed) {
                     delete sendButton.dataset.hearthProcessed;
+                    console.log('🔄 Already processed, allowing click through');
                     return; // Allow the click
                 }
 
                 e.preventDefault();
                 e.stopPropagation();
+                console.log('⏸️ Click intercepted, processing...');
 
                 await handleSend(platform, config, () => {
                     sendButton.dataset.hearthProcessed = "true";
                     sendButton.click();
+                    console.log('▶️ Re-triggered send button click');
                 });
             }
         }, true);
@@ -115,15 +126,22 @@
         // Watch for Enter key (without Shift)
         document.addEventListener('keydown', async (e) => {
             if (e.key === 'Enter' && !e.shiftKey) {
+                console.log('⌨️ Enter key pressed (no shift)');
                 const textarea = document.querySelector(config.textarea);
+                console.log('📝 Found textarea?', !!textarea, textarea);
+
                 if (textarea && (document.activeElement === textarea || textarea.contains(document.activeElement))) {
+                    console.log('✅ Enter in textarea detected!');
+
                     if (textarea.dataset.hearthProcessed) {
                         delete textarea.dataset.hearthProcessed;
+                        console.log('🔄 Already processed, allowing Enter through');
                         return;
                     }
 
                     e.preventDefault();
                     e.stopPropagation();
+                    console.log('⏸️ Enter intercepted, processing...');
 
                     await handleSend(platform, config, () => {
                         textarea.dataset.hearthProcessed = "true";
@@ -137,6 +155,7 @@
                             shiftKey: false
                         });
                         textarea.dispatchEvent(newEvent);
+                        console.log('▶️ Re-triggered Enter keydown event');
                     });
                 }
             }
@@ -144,35 +163,48 @@
     }
 
     async function handleSend(platform, config, triggerCallback) {
+        console.log('📨 handleSend called for platform:', platform);
+
         // Get the user's message
         const textarea = document.querySelector(config.textarea);
+        console.log('📝 Textarea element:', textarea);
+
         if (!textarea) {
+            console.warn('⚠️ No textarea found, triggering send anyway');
             triggerCallback();
             return;
         }
 
         const userMessage = getMessageText(textarea, platform);
+        console.log('💬 Extracted message text:', userMessage ? `"${userMessage.substring(0, 50)}..."` : '(empty)');
 
         if (!userMessage || !userMessage.trim()) {
+            console.warn('⚠️ Empty message, triggering send anyway');
             triggerCallback();
             return;
         }
 
         // Get Hearth context
+        console.log('🔍 Fetching Hearth context...');
         const hearthContext = await getHearthContext(userMessage);
+        console.log('📦 Hearth context received:', hearthContext);
 
         // Build enriched message
         const enrichedMessage = buildEnrichedMessage(userMessage, hearthContext);
+        console.log('✨ Enriched message:', enrichedMessage !== userMessage ? 'YES (added context)' : 'NO (no context to add)');
 
         // Set the enriched message
         if (enrichedMessage !== userMessage) {
+            console.log('📝 Setting enriched message in textarea...');
             setMessageText(textarea, enrichedMessage, platform);
         }
 
         // Trigger the actual send
+        console.log('▶️ Triggering callback to send message...');
         triggerCallback();
 
         // Update heat map and check for crystallization (async, don't block)
+        console.log('🔄 Calling updateHearth...');
         updateHearth(userMessage, hearthContext);
     }
 
