@@ -183,47 +183,34 @@
     async function handleSend(platform, config, triggerCallback) {
         console.log('📨 handleSend called for platform:', platform);
 
-        // Get the user's message
+        // Get the user's message for memory extraction
+        // Do NOT modify the textarea - let the message send as-is
         const textarea = document.querySelector(config.textarea);
         console.log('📝 Textarea element:', textarea);
 
-        if (!textarea) {
-            console.warn('⚠️ No textarea found, triggering send anyway');
-            triggerCallback();
-            return;
+        let userMessage = '';
+        if (textarea) {
+            userMessage = getMessageText(textarea, platform);
+            console.log('💬 Captured message text:', userMessage ? `"${userMessage.substring(0, 50)}..."` : '(empty)');
+        } else {
+            console.warn('⚠️ No textarea found');
         }
 
-        const userMessage = getMessageText(textarea, platform);
-        console.log('💬 Extracted message text:', userMessage ? `"${userMessage.substring(0, 50)}..."` : '(empty)');
-
-        if (!userMessage || !userMessage.trim()) {
-            console.warn('⚠️ Empty message, triggering send anyway');
-            triggerCallback();
-            return;
-        }
-
-        // Get Hearth context
-        console.log('🔍 Fetching Hearth context...');
-        const hearthContext = await getHearthContext(userMessage);
-        console.log('📦 Hearth context received:', hearthContext);
-
-        // Build enriched message
-        const enrichedMessage = buildEnrichedMessage(userMessage, hearthContext);
-        console.log('✨ Enriched message:', enrichedMessage !== userMessage ? 'YES (added context)' : 'NO (no context to add)');
-
-        // Set the enriched message
-        if (enrichedMessage !== userMessage) {
-            console.log('📝 Setting enriched message in textarea...');
-            setMessageText(textarea, enrichedMessage, platform);
-        }
-
-        // Trigger the actual send
-        console.log('▶️ Triggering callback to send message...');
+        // Trigger the actual send immediately (don't block or modify)
+        console.log('▶️ Triggering send (unmodified)...');
         triggerCallback();
 
-        // Update heat map and check for crystallization (async, don't block)
-        console.log('🔄 Calling updateHearth...');
-        updateHearth(userMessage, hearthContext);
+        // If we have a message, process it in the background for memory extraction
+        if (userMessage && userMessage.trim()) {
+            console.log('🔄 Processing message in background for memory extraction...');
+
+            // Get Hearth context (for memory retrieval and heat map)
+            const hearthContext = await getHearthContext(userMessage);
+            console.log('📦 Hearth context received');
+
+            // Update heat map and check for memory extraction (async, don't block)
+            updateHearth(userMessage, hearthContext);
+        }
     }
 
     function getMessageText(textarea, platform) {
