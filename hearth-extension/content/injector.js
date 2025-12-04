@@ -127,14 +127,30 @@
         document.addEventListener('keydown', async (e) => {
             if (e.key === 'Enter' && !e.shiftKey) {
                 console.log('⌨️ Enter key pressed (no shift)');
+                console.log('🎯 Active element:', document.activeElement);
+                console.log('🎯 Is contenteditable?', document.activeElement?.contentEditable === 'true');
+
+                // For contenteditable divs (Claude, Gemini), check if we're in one
+                const isInContentEditable = document.activeElement?.contentEditable === 'true';
+
+                // Also try to find the textarea via selector as fallback
                 const textarea = document.querySelector(config.textarea);
-                console.log('📝 Found textarea?', !!textarea, textarea);
+                console.log('📝 Found textarea via selector?', !!textarea, textarea);
 
-                if (textarea && (document.activeElement === textarea || textarea.contains(document.activeElement))) {
-                    console.log('✅ Enter in textarea detected!');
+                // Check if we're in the message input
+                const inMessageInput = isInContentEditable ||
+                    (textarea && (document.activeElement === textarea || textarea.contains(document.activeElement)));
 
-                    if (textarea.dataset.hearthProcessed) {
-                        delete textarea.dataset.hearthProcessed;
+                console.log('📝 In message input?', inMessageInput);
+
+                if (inMessageInput) {
+                    console.log('✅ Enter in message input detected!');
+
+                    // Use the active element if it's contenteditable, otherwise fall back to textarea
+                    const targetElement = isInContentEditable ? document.activeElement : textarea;
+
+                    if (targetElement?.dataset.hearthProcessed) {
+                        delete targetElement.dataset.hearthProcessed;
                         console.log('🔄 Already processed, allowing Enter through');
                         return;
                     }
@@ -144,7 +160,9 @@
                     console.log('⏸️ Enter intercepted, processing...');
 
                     await handleSend(platform, config, () => {
-                        textarea.dataset.hearthProcessed = "true";
+                        if (targetElement) {
+                            targetElement.dataset.hearthProcessed = "true";
+                        }
                         const newEvent = new KeyboardEvent('keydown', {
                             key: 'Enter',
                             code: 'Enter',
@@ -154,7 +172,7 @@
                             cancelable: true,
                             shiftKey: false
                         });
-                        textarea.dispatchEvent(newEvent);
+                        (targetElement || document.activeElement).dispatchEvent(newEvent);
                         console.log('▶️ Re-triggered Enter keydown event');
                     });
                 }
