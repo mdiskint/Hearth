@@ -1,5 +1,4 @@
 import { supabase } from '../lib/supabase-bundle.js';
-import { enrichMemoryMetadata } from '../core/memoryExtractor.js';
 
 document.addEventListener('DOMContentLoaded', async () => {
     const { data: { user } } = await supabase.auth.getUser();
@@ -232,20 +231,28 @@ async function loadSettings(user) {
         }
 
         status.textContent = `Found ${toEnrich.length} memories to enrich...`;
-
         let count = 0;
         for (const mem of toEnrich) {
             count++;
             status.textContent = `Enriching ${count}/${toEnrich.length}: "${mem.content.substring(0, 20)}..."`;
 
-            const metadata = await enrichMemoryMetadata(apiKey, mem.content);
+            // Delegate to background script to avoid CORS
+            const response = await new Promise(resolve => {
+                chrome.runtime.sendMessage({
+                    type: 'ENRICH_MEMORY',
+                    content: mem.content
+                }, resolve);
+            });
 
-            if (metadata) {
+            if (response && response.metadata) {
+                const metadata = response.metadata;
                 await supabase.from('memories').update({
                     domains: metadata.domains,
                     emotions: metadata.emotions,
                     intensity: metadata.intensity
                 }).eq('id', mem.id);
+            } else if (response && response.error) {
+                console.error('Enrichment error:', response.error);
             }
 
             // Rate limit pause

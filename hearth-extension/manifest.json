@@ -12,7 +12,8 @@
         "https://chat.openai.com/*",
         "https://chatgpt.com/*",
         "https://gemini.google.com/*",
-        "https://olqyvnqaosfkzhttjqzt.supabase.co/*"
+        "https://olqyvnqaosfkzhttjqzt.supabase.co/*",
+        "https://api.anthropic.com/*"
     ],
     "action": {
         "default_popup": "popup/popup.html",

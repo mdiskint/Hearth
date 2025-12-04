@@ -2,7 +2,7 @@ import { HeatTracker } from '../core/heatTracker.js';
 import { MemoryRetriever } from '../core/memoryRetriever.js';
 import { DimensionDetector } from '../core/dimensionDetector.js';
 import { supabase } from '../lib/supabase-bundle.js';
-import { checkSignificance, extractMemory } from '../core/memoryExtractor.js';
+import { checkSignificance, extractMemory, enrichMemoryMetadata } from '../core/memoryExtractor.js';
 
 let heatTracker;
 let memoryRetriever;
@@ -76,6 +76,11 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
     if (request.type === 'CHECK_SIGNIFICANCE') {
         handleSignificanceCheck(request).then(sendResponse);
+        return true;
+    }
+
+    if (request.type === 'ENRICH_MEMORY') {
+        handleEnrichment(request).then(sendResponse);
         return true;
     }
 
@@ -182,5 +187,22 @@ async function handleSignificanceCheck(request) {
     } catch (err) {
         console.error('❌ Error in significance check:', err);
         return { significant: false };
+    }
+}
+
+async function handleEnrichment(request) {
+    console.log('✨ Enriching memory:', request.content.substring(0, 30) + '...');
+    const { apiKey } = await chrome.storage.local.get('apiKey');
+
+    if (!apiKey) {
+        return { error: 'No API key set' };
+    }
+
+    try {
+        const metadata = await enrichMemoryMetadata(apiKey, request.content);
+        return { metadata };
+    } catch (err) {
+        console.error('❌ Enrichment failed:', err);
+        return { error: err.message };
     }
 }
