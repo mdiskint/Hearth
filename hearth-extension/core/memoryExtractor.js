@@ -65,7 +65,13 @@ async function callClaude(apiKey, systemPrompt, messages, model = 'claude-3-haik
     });
 
     if (!response.ok) {
-        throw new Error(`Claude API error: ${response.statusText}`);
+        const errorText = await response.text();
+        console.error('❌ Claude API Error Details:', {
+            status: response.status,
+            statusText: response.statusText,
+            body: errorText
+        });
+        throw new Error(`Claude API error: ${response.status} ${response.statusText} - ${errorText}`);
     }
 
     const data = await response.json();

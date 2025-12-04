@@ -143,7 +143,10 @@ async function loadSettings(user) {
     document.getElementById('import-baseline').addEventListener('click', async () => {
         const text = document.getElementById('baseline-input').value;
         const status = document.getElementById('import-status');
-        if (!text) return;
+        if (!text) {
+            status.textContent = '❌ Please paste content first.';
+            return;
+        }
 
         try {
             status.textContent = 'Parsing...';
@@ -152,11 +155,22 @@ async function loadSettings(user) {
             // Try parsing JSON first
             try {
                 const json = JSON.parse(text);
+                let rawList = [];
+
                 if (json.memories && Array.isArray(json.memories)) {
-                    memories = json.memories;
+                    rawList = json.memories;
                 } else if (Array.isArray(json)) {
-                    memories = json;
+                    rawList = json;
                 }
+
+                // Normalize to objects
+                memories = rawList.map(item => {
+                    if (typeof item === 'string') {
+                        return { content: item, domains: [], emotions: [], intensity: 0.5 };
+                    }
+                    return item;
+                });
+
             } catch (e) {
                 // Fallback to text parsing if JSON fails
                 console.log('JSON parse failed, trying text format');
@@ -169,16 +183,28 @@ async function loadSettings(user) {
                             content: contentMatch[1].trim(),
                             domains: [], emotions: [], intensity: 0.5
                         });
+                    } else {
+                        // Try to capture just the line if regex fails
+                        const lines = block.split('\n');
+                        if (lines[0] && lines[0].trim()) {
+                            memories.push({
+                                content: lines[0].trim(),
+                                domains: [], emotions: [], intensity: 0.5
+                            });
+                        }
                     }
                 });
             }
 
             if (memories.length > 0) {
-                status.textContent = `Importing ${memories.length} memories...`;
+                status.textContent = `Found ${memories.length} memories. Importing...`;
                 let count = 0;
+                let errors = 0;
 
                 for (const mem of memories) {
-                    await supabase.from('memories').insert({
+                    if (!mem.content) continue;
+
+                    const { error } = await supabase.from('memories').insert({
                         user_id: user.id,
                         content: mem.content,
                         domains: mem.domains || [],
@@ -186,14 +212,24 @@ async function loadSettings(user) {
                         intensity: mem.intensity || 0.5,
                         source: 'import_json'
                     });
-                    count++;
+
+                    if (error) {
+                        console.error('Import error:', error);
+                        errors++;
+                    } else {
+                        count++;
+                    }
                     status.textContent = `Importing ${count}/${memories.length}...`;
                 }
 
-                status.textContent = `✅ Successfully imported ${count} memories!`;
+                if (errors > 0) {
+                    status.textContent = `✅ Imported ${count} memories (${errors} failed). Reloading...`;
+                } else {
+                    status.textContent = `✅ Successfully imported ${count} memories! Reloading...`;
+                }
                 setTimeout(() => window.location.reload(), 1500);
             } else {
-                status.textContent = '❌ No memories found in input.';
+                status.textContent = '❌ No memories found. Check format.';
             }
         } catch (err) {
             console.error(err);
