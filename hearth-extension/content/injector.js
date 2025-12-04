@@ -172,20 +172,11 @@
 
             if (sendButton) {
                 console.log('✅ Send button clicked!');
-                // We need to capture the click, inject, then let it proceed or re-trigger
-                // But for React apps, modifying the DOM value directly often doesn't update the internal state.
-                // We'll try to intercept, modify, and then trigger the send.
 
-                // However, preventing default on a click listener might be too late or break things.
-                // A better approach for these apps is often to listen for the capture phase.
-
-                // For this implementation, we'll try to modify the text BEFORE the app processes the send.
-                // Since we can't easily pause the click event propagation asynchronously, 
-                // we might need to be fast or use a different strategy.
-
-                // Strategy: 
-                // 1. Check if we have already enriched the message.
-                // 2. If not, stop propagation, enrich, update DOM, dispatch input events, then click again.
+                // CAPTURE TEXT IMMEDIATELY before any async or preventDefault
+                const textarea = document.querySelector(config.textarea);
+                const userMessage = textarea ? getMessageText(textarea, platform) : '';
+                console.log('💬 Captured text IMMEDIATELY (click):', userMessage ? `"${userMessage.substring(0, 50)}..."` : '(empty)');
 
                 if (sendButton.dataset.hearthProcessed) {
                     delete sendButton.dataset.hearthProcessed;
@@ -197,7 +188,7 @@
                 e.stopPropagation();
                 console.log('⏸️ Click intercepted, processing...');
 
-                await handleSend(platform, config, () => {
+                await handleSend(platform, config, userMessage, () => {
                     sendButton.dataset.hearthProcessed = "true";
                     sendButton.click();
                     console.log('▶️ Re-triggered send button click');
@@ -231,6 +222,10 @@
                     // Use the active element if it's contenteditable, otherwise fall back to textarea
                     const targetElement = isInContentEditable ? document.activeElement : textarea;
 
+                    // CAPTURE TEXT IMMEDIATELY, before preventDefault or any async operations
+                    const userMessage = getMessageText(targetElement, platform);
+                    console.log('💬 Captured text IMMEDIATELY:', userMessage ? `"${userMessage.substring(0, 50)}..."` : '(empty)');
+
                     if (targetElement?.dataset.hearthProcessed) {
                         delete targetElement.dataset.hearthProcessed;
                         console.log('🔄 Already processed, allowing Enter through');
@@ -241,7 +236,7 @@
                     e.stopPropagation();
                     console.log('⏸️ Enter intercepted, processing...');
 
-                    await handleSend(platform, config, () => {
+                    await handleSend(platform, config, userMessage, () => {
                         if (targetElement) {
                             targetElement.dataset.hearthProcessed = "true";
                         }
@@ -262,21 +257,9 @@
         }, true);
     }
 
-    async function handleSend(platform, config, triggerCallback) {
+    async function handleSend(platform, config, userMessage, triggerCallback) {
         console.log('📨 handleSend called for platform:', platform);
-
-        // Get the user's message
-        const textarea = document.querySelector(config.textarea);
-        console.log('📝 Textarea element:', textarea);
-
-        if (!textarea) {
-            console.warn('⚠️ No textarea found, triggering send anyway');
-            triggerCallback();
-            return;
-        }
-
-        const userMessage = getMessageText(textarea, platform);
-        console.log('💬 Extracted message text:', userMessage ? `"${userMessage.substring(0, 50)}..."` : '(empty)');
+        console.log('💬 Received pre-captured message:', userMessage ? `"${userMessage.substring(0, 50)}..."` : '(empty)');
 
         if (!userMessage || !userMessage.trim()) {
             console.warn('⚠️ Empty message, triggering send anyway');
