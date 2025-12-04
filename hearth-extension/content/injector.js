@@ -289,10 +289,26 @@
     }
 
     function getMessageText(textarea, platform) {
-        if (platform === 'claude' || platform === 'gemini') {
-            return textarea.innerText || textarea.textContent;
+        if (!textarea) {
+            console.warn('⚠️ getMessageText: No textarea provided');
+            return '';
         }
-        return textarea.value || textarea.innerText || textarea.textContent;
+
+        let text = '';
+        if (platform === 'claude' || platform === 'gemini') {
+            // Try multiple methods for contenteditable
+            text = textarea.innerText || textarea.textContent || textarea.innerHTML.replace(/<[^>]*>/g, '');
+            console.log('📝 getMessageText (contenteditable):', {
+                innerText: textarea.innerText,
+                textContent: textarea.textContent,
+                selected: text
+            });
+        } else {
+            text = textarea.value || textarea.innerText || textarea.textContent;
+            console.log('📝 getMessageText (textarea):', textarea.value);
+        }
+
+        return text || '';
     }
 
     function setMessageText(textarea, text, platform) {
