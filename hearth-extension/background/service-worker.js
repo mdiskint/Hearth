@@ -2,6 +2,7 @@ import { HeatTracker } from '../core/heatTracker.js';
 import { MemoryRetriever } from '../core/memoryRetriever.js';
 import { DimensionDetector } from '../core/dimensionDetector.js';
 import { supabase } from '../lib/supabase-bundle.js';
+import { checkSignificance, extractMemory } from '../core/memoryExtractor.js';
 
 let heatTracker;
 let memoryRetriever;
@@ -140,9 +141,6 @@ async function handleSignificanceCheck(request) {
     }
 
     try {
-        // Dynamic import of memory extractor
-        const { checkSignificance, extractMemory } = await import('../core/memoryExtractor.js');
-
         const isSignificant = await checkSignificance(apiKey, request.message, request.context || []);
         console.log('📊 Significance result:', isSignificant);
 
