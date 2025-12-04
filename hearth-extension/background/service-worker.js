@@ -163,8 +163,8 @@ async function handleSignificanceCheck(request) {
                     summary: memory.summary,
                     domains: memory.domains,
                     emotions: memory.emotions,
-                    intensity: memory.intensity,
-                    source: 'extension'
+                    intensity: memory.intensity
+                    // source column does not exist in DB
                 });
 
                 if (error) {

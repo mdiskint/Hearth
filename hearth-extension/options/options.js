@@ -245,12 +245,13 @@ async function loadSettings(user) {
                         content: mem.content,
                         domains: domains,
                         emotions: emotions,
-                        intensity: intensity,
-                        source: 'import_json'
+                        intensity: intensity
+                        // source column does not exist in DB
                     });
 
                     if (error) {
-                        console.error('Import error:', error);
+                        console.error('Import error details:', error);
+                        status.textContent = `❌ Error on item ${count + 1}: ${error.message || JSON.stringify(error)}`;
                         errors++;
                     } else {
                         count++;
