@@ -225,6 +225,7 @@
 
                 if (!extensionId) {
                     console.warn('⚠️ Extension context invalidated. Please reload the page.');
+                    showContextInvalidatedNotification();
                     resolve({ eos: null, memories: [], heatMap: null });
                     return;
                 }
@@ -282,6 +283,23 @@
 
     // Track conversation for memory extraction
     let conversationHistory = [];
+    let hasShownContextInvalidatedWarning = false;
+
+    function showContextInvalidatedNotification() {
+        if (hasShownContextInvalidatedWarning) return;
+        hasShownContextInvalidatedWarning = true;
+
+        const notification = document.createElement('div');
+        notification.id = 'hearth-context-warning';
+        notification.innerHTML = `
+            <div style="position: fixed; top: 20px; right: 20px; background: #ff6b6b; color: white; padding: 16px 20px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.3); z-index: 999999; font-family: system-ui; max-width: 350px;">
+                <div style="font-weight: 600; margin-bottom: 8px;">⚠️ Hearth Extension Disconnected</div>
+                <div style="font-size: 13px; margin-bottom: 12px;">The extension was reloaded. Please refresh this page to restore functionality.</div>
+                <button onclick="location.reload()" style="background: white; color: #ff6b6b; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-weight: 600;">Reload Page</button>
+            </div>
+        `;
+        document.body.appendChild(notification);
+    }
 
     function updateHearth(userMessage, hearthContext) {
         console.log('🔄 updateHearth called with message:', userMessage.substring(0, 50) + '...');
@@ -289,6 +307,7 @@
         // Check if extension context is still valid
         if (!chrome.runtime?.id) {
             console.warn('⚠️ Extension context invalidated, skipping Hearth update');
+            showContextInvalidatedNotification();
             return;
         }
 
