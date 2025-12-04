@@ -197,6 +197,14 @@ async function loadSettings(user) {
             }
 
             if (memories.length > 0) {
+                const shouldEnrich = document.getElementById('auto-enrich-check').checked;
+                const { apiKey } = await chrome.storage.local.get('apiKey');
+
+                if (shouldEnrich && !apiKey) {
+                    status.textContent = '⚠️ API Key required for auto-enrichment. Saving flat memories...';
+                    await new Promise(r => setTimeout(r, 2000));
+                }
+
                 status.textContent = `Found ${memories.length} memories. Importing...`;
                 let count = 0;
                 let errors = 0;
@@ -204,12 +212,40 @@ async function loadSettings(user) {
                 for (const mem of memories) {
                     if (!mem.content) continue;
 
+                    let domains = mem.domains || [];
+                    let emotions = mem.emotions || [];
+                    let intensity = mem.intensity || 0.5;
+
+                    // Auto-enrich if requested and key available
+                    if (shouldEnrich && apiKey) {
+                        status.textContent = `Enriching & Importing ${count + 1}/${memories.length}...`;
+                        try {
+                            // Delegate to background
+                            const response = await new Promise(resolve => {
+                                chrome.runtime.sendMessage({
+                                    type: 'ENRICH_MEMORY',
+                                    content: mem.content
+                                }, resolve);
+                            });
+
+                            if (response && response.metadata) {
+                                domains = response.metadata.domains;
+                                emotions = response.metadata.emotions;
+                                intensity = response.metadata.intensity;
+                            }
+                        } catch (e) {
+                            console.warn('Enrichment failed for item, saving flat:', e);
+                        }
+                    } else {
+                        status.textContent = `Importing ${count + 1}/${memories.length}...`;
+                    }
+
                     const { error } = await supabase.from('memories').insert({
                         user_id: user.id,
                         content: mem.content,
-                        domains: mem.domains || [],
-                        emotions: mem.emotions || [],
-                        intensity: mem.intensity || 0.5,
+                        domains: domains,
+                        emotions: emotions,
+                        intensity: intensity,
                         source: 'import_json'
                     });
 
@@ -219,7 +255,6 @@ async function loadSettings(user) {
                     } else {
                         count++;
                     }
-                    status.textContent = `Importing ${count}/${memories.length}...`;
                 }
 
                 if (errors > 0) {

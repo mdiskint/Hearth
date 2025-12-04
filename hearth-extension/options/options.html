@@ -52,10 +52,17 @@
                 Import memories from a JSON file or text. Format:
                 <code>{ "memories": [{ "content": "...", "domains": [...], ... }] }</code>
             </p>
-            <textarea id="baseline-input" placeholder='{ "memories": [...] }'></textarea>
-            <div style="display: flex; gap: 10px; margin-top: 10px;">
-                <button id="import-baseline">Import JSON</button>
-                <button id="enrich-memories" class="secondary">✨ Enrich Existing Memories</button>
+            <textarea id="baseline-input" placeholder='{ "memories": [...] }' style="min-height: 100px;"></textarea>
+            <div style="margin-top: 10px; display: flex; flex-direction: column; gap: 10px;">
+                <label
+                    style="display: flex; align-items: center; gap: 8px; font-size: 13px; color: #ccc; cursor: pointer;">
+                    <input type="checkbox" id="auto-enrich-check" checked>
+                    ✨ Auto-enrich with Claude (adds domains/emotions)
+                </label>
+                <div style="display: flex; gap: 10px;">
+                    <button id="import-baseline" class="primary">Import Memories</button>
+                    <button id="enrich-memories" class="secondary">Enrich Database Only</button>
+                </div>
             </div>
             <p id="import-status" style="margin-top: 8px; font-size: 12px; color: #888;"></p>
         </section>
