@@ -284,6 +284,8 @@
     let conversationHistory = [];
 
     function updateHearth(userMessage, hearthContext) {
+        console.log('🔄 updateHearth called with message:', userMessage.substring(0, 50) + '...');
+
         // Check if extension context is still valid
         if (!chrome.runtime?.id) {
             console.warn('⚠️ Extension context invalidated, skipping Hearth update');
@@ -314,6 +316,7 @@
 
         // Check significance and extract memory in background
         try {
+            console.log('📤 Sending CHECK_SIGNIFICANCE to background...');
             chrome.runtime.sendMessage({
                 type: 'CHECK_SIGNIFICANCE',
                 message: userMessage,

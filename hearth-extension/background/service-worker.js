@@ -147,7 +147,8 @@ async function handleSignificanceCheck(request) {
 
     try {
         const isSignificant = await checkSignificance(apiKey, request.message, request.context || []);
-        console.log('📊 Significance result:', isSignificant);
+        console.log('📊 Significance check complete for:', request.message.substring(0, 30) + '...');
+        console.log('📊 Result: ' + (isSignificant ? 'SIGNIFICANT ✨' : 'not significant'));
 
         if (isSignificant) {
             console.log('✨ Significant message detected, extracting memory...');
