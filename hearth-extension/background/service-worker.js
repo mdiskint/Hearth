@@ -161,11 +161,10 @@ async function handleSignificanceCheck(request) {
                 const { error } = await supabase.from('memories').insert({
                     user_id: user.id,
                     content: memory.content,
-                    summary: memory.summary,
                     domains: memory.domains,
                     emotions: memory.emotions,
                     intensity: memory.intensity
-                    // source column does not exist in DB
+                    // summary and source columns do not exist in DB
                 });
 
                 if (error) {
