@@ -215,28 +215,37 @@
         // Send message to background script to get Hearth context
         return new Promise((resolve) => {
             try {
-                // Check if extension context is still valid
-                if (!chrome.runtime?.id) {
+                // 1. Safe check for extension ID
+                let extensionId = null;
+                try {
+                    extensionId = chrome?.runtime?.id;
+                } catch (e) {
+                    // Accessing runtime.id can throw if context is invalidated
+                }
+
+                if (!extensionId) {
                     console.warn('⚠️ Extension context invalidated. Please reload the page.');
                     resolve({ eos: null, memories: [], heatMap: null });
                     return;
                 }
 
+                // 2. Safe sendMessage
                 chrome.runtime.sendMessage(
                     { type: 'GET_HEARTH_CONTEXT', message: userMessage },
                     (response) => {
-                        // Check for errors (like extension reload)
-                        if (chrome.runtime.lastError) {
-                            console.warn('⚠️ Extension error:', chrome.runtime.lastError.message);
-                            console.warn('💡 Tip: Reload this page after updating the extension');
+                        // 3. Check for lastError in callback
+                        const lastError = chrome.runtime.lastError;
+                        if (lastError) {
+                            console.warn('⚠️ Extension connection error:', lastError.message);
                             resolve({ eos: null, memories: [], heatMap: null });
                             return;
                         }
-                        resolve(response);
+                        resolve(response || { eos: null, memories: [], heatMap: null });
                     }
                 );
             } catch (err) {
-                console.error('❌ Error getting Hearth context:', err);
+                // 4. Catch synchronous errors (like sendMessage throwing)
+                console.warn('⚠️ Error communicating with extension:', err.message);
                 resolve({ eos: null, memories: [], heatMap: null });
             }
         });
