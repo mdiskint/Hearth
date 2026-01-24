@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Hearth</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  
+  <!-- WELCOME SCREEN -->
+  <div id="welcome-screen" class="screen">
+    <div class="welcome-content">
+      <h1>👋 Hi, I'm Hearth</h1>
+      <p class="subtitle">I'm an AI that adapts to individuals, not averages.</p>
+      <p>But I need to understand you first.</p>
+      <p class="highlight">Answer 15 quick questions so I can learn how to work with <strong>you</strong> specifically.</p>
+      <p class="time-estimate">Takes about 3 minutes.</p>
+      <div class="button-group">
+        <button id="start-quiz-btn" class="btn-primary">Let's go</button>
+        <button id="skip-quiz-btn" class="btn-secondary">Maybe later</button>
+      </div>
+    </div>
+  </div>
+  
+  <!-- QUIZ SCREEN -->
+  <div id="quiz-screen" class="screen hidden">
+    <div class="progress-bar">
+      <div id="progress-fill" class="progress-fill"></div>
+    </div>
+    <div class="progress-text">
+      <span id="current-question">1</span> / <span id="total-questions">15</span>
+    </div>
+    
+    <div class="quiz-content">
+      <div class="section-label" id="section-label"></div>
+      <h2 class="question-text" id="question-text"></h2>
+      <p class="question-instruction" id="question-instruction"></p>
+      
+      <div id="answers-container" class="answers-container"></div>
+      
+      <div class="quiz-navigation">
+        <button id="back-btn" class="btn-secondary" disabled>Back</button>
+        <button id="next-btn" class="btn-primary" disabled>Next</button>
+      </div>
+    </div>
+  </div>
+  
+  <!-- RESULT SCREEN -->
+  <div id="result-screen" class="screen hidden">
+    <div class="result-content">
+      <h1>✨ Got it.</h1>
+      <h2>Here's what I learned about you:</h2>
+      
+      <div class="archetype-card">
+        <h3 id="archetype-title">Your AI Personality</h3>
+        <p id="archetype-subtitle">You're a...</p>
+      </div>
+      
+      <div class="highlights-section">
+        <p>Here's how I'll work with you:</p>
+        <div id="highlights-list"></div>
+      </div>
+      
+      <div class="opspec-preview">
+        <button id="toggle-opspec-btn" class="btn-link">See Full Operating Specification ▼</button>
+        <div id="opspec-full" class="opspec-full hidden">
+          <div class="opspec-section">
+            <h4>Identity</h4>
+            <p id="opspec-identity"></p>
+          </div>
+          <div class="opspec-section">
+            <h4>Constraints</h4>
+            <ul id="opspec-constraints"></ul>
+          </div>
+          <div class="opspec-section">
+            <h4>Communication Style</h4>
+            <p id="opspec-communication"></p>
+          </div>
+          <div class="opspec-section">
+            <h4>Execution</h4>
+            <p id="opspec-execution"></p>
+          </div>
+          <div class="opspec-section">
+            <h4>Balance Check</h4>
+            <p id="opspec-balance"></p>
+          </div>
+        </div>
+      </div>
+      
+      <div class="button-group">
+        <button id="start-using-btn" class="btn-primary">Let's go!</button>
+        <button id="retake-quiz-btn" class="btn-secondary">Retake quiz</button>
+        <button id="edit-opspec-btn" class="btn-secondary">Edit OpSpec</button>
+      </div>
+    </div>
+  </div>
+  
+  <!-- MAIN DASHBOARD (post-quiz) -->
+  <div id="dashboard-screen" class="screen hidden">
+    <div class="dashboard-header">
+      <h2>Hearth</h2>
+      <div class="status-indicator" id="status-indicator">
+        <span class="status-dot active"></span>
+        <span>Active</span>
+      </div>
+    </div>
+    
+    <div class="dashboard-content">
+      <div class="section">
+        <h3>Your Operating Specification</h3>
+        <div class="opspec-summary" id="dashboard-opspec-summary"></div>
+        <button id="view-edit-opspec-btn" class="btn-secondary">View/Edit OpSpec</button>
+      </div>
+      
+      <div class="section">
+        <div class="section-header">
+          <h3>Memories</h3>
+          <button id="add-memory-btn" class="btn-secondary">+ Add Memory</button>
+        </div>
+
+        <!-- Memory Type Filters -->
+        <div id="memory-filters" class="memory-filters">
+          <button class="filter-btn active" data-filter="all">All</button>
+          <button class="filter-btn" data-filter="fact">Facts</button>
+          <button class="filter-btn" data-filter="value">Values</button>
+          <button class="filter-btn" data-filter="reward">Rewards</button>
+          <button class="filter-btn" data-filter="synthesis">Synthesis</button>
+          <button class="filter-btn" data-filter="partner_model">Partner</button>
+          <button class="filter-btn" data-filter="self_model">Self</button>
+        </div>
+
+        <!-- Empty State -->
+        <div id="memory-empty-state" class="empty-state hidden">
+          <p>No memories yet. Add your first memory to help me understand you better.</p>
+          <div class="empty-state-actions">
+            <button id="add-first-memory-btn" class="btn-primary">Add Memory</button>
+            <button id="import-memories-btn" class="btn-secondary">Import from Chat History</button>
+          </div>
+        </div>
+
+        <!-- Import Progress Indicator -->
+        <div id="import-progress" class="import-progress hidden">
+          <div class="progress-spinner"></div>
+          <span id="import-status" class="import-status">Processing...</span>
+        </div>
+
+        <!-- Memory List -->
+        <div id="memory-list" class="memory-list"></div>
+      </div>
+      
+      <div class="section">
+        <h3>Settings</h3>
+        <label class="toggle-setting">
+          <input type="checkbox" id="enable-injection-toggle" checked>
+          <span>Enable context injection</span>
+        </label>
+        <label class="toggle-setting">
+          <input type="checkbox" id="visible-injection-toggle" checked>
+          <span>Show injected context (for debugging)</span>
+        </label>
+      </div>
+      
+      <div class="section">
+        <button id="retake-quiz-dashboard-btn" class="btn-link">Retake personality quiz</button>
+      </div>
+    </div>
+  </div>
+  
+  <!-- MEMORY MODAL -->
+  <div id="memory-modal" class="modal hidden">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 id="memory-modal-title">Add Memory</h3>
+        <button id="close-memory-modal" class="close-btn">&times;</button>
+      </div>
+      
+      <div class="modal-body">
+        <div class="form-group">
+          <label for="memory-content">Memory Content <span class="char-count">(<span id="char-count">0</span>/500)</span></label>
+          <textarea id="memory-content" rows="4" maxlength="500" placeholder="What should I remember about you?"></textarea>
+        </div>
+        
+        <div class="form-row">
+          <div class="form-group">
+            <label for="memory-type">Type</label>
+            <select id="memory-type">
+              <option value="fact">Fact - Concrete information</option>
+              <option value="value">Value - What matters to you</option>
+              <option value="reward">Reward - Feedback on a value</option>
+              <option value="synthesis">Synthesis - Pattern/insight</option>
+              <option value="partner_model">Partner Model - About the AI</option>
+              <option value="self_model">Self Model - About yourself</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label for="memory-heat">Heat (Importance): <span id="heat-value">0.5</span></label>
+            <input type="range" id="memory-heat" min="0" max="1" step="0.1" value="0.5">
+            <div class="heat-labels">
+              <span>Low</span>
+              <span>High</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Reward-specific fields (shown conditionally) -->
+        <div id="reward-fields" class="form-row hidden">
+          <div class="form-group">
+            <label for="memory-parent">Linked Value</label>
+            <select id="memory-parent">
+              <option value="">Select a value memory...</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="memory-outcome">Outcome</label>
+            <select id="memory-outcome">
+              <option value="">Select outcome...</option>
+              <option value="+1">+1 (Positive)</option>
+              <option value="0">0 (Neutral)</option>
+              <option value="-1">-1 (Negative)</option>
+            </select>
+          </div>
+        </div>
+        
+        <div class="form-row">
+          <div class="form-group">
+            <label for="memory-domain">Life Domain</label>
+            <select id="memory-domain">
+              <option value="">Select domain...</option>
+              <option value="Work">Work</option>
+              <option value="Relationships">Relationships</option>
+              <option value="Creative">Creative</option>
+              <option value="Self">Self</option>
+              <option value="Decisions">Decisions</option>
+              <option value="Resources">Resources</option>
+              <option value="Values">Values</option>
+            </select>
+          </div>
+          
+          <div class="form-group">
+            <label for="memory-emotion">Emotional State</label>
+            <select id="memory-emotion">
+              <option value="">Select emotion...</option>
+              <option value="Joy">Joy</option>
+              <option value="Curiosity">Curiosity</option>
+              <option value="Pride">Pride</option>
+              <option value="Peace">Peace</option>
+              <option value="Grief">Grief</option>
+              <option value="Fear">Fear</option>
+              <option value="Anxiety">Anxiety</option>
+              <option value="Shame">Shame</option>
+              <option value="Anger">Anger</option>
+              <option value="Care">Care</option>
+            </select>
+          </div>
+        </div>
+      </div>
+      
+      <div class="modal-footer">
+        <button id="cancel-memory-btn" class="btn-secondary">Cancel</button>
+        <button id="save-memory-btn" class="btn-primary">Save Memory</button>
+      </div>
+    </div>
+  </div>
+  
+  <script src="../utils/embeddings.js"></script>
+  <script src="../utils/supabaseSync.js"></script>
+  <script src="../storage/storage.js"></script>
+  <script src="../utils/quiz-questions.js"></script>
+  <script src="../utils/opspec-generator.js"></script>
+  <script src="../utils/chatParser.js"></script>
+  <script src="../utils/memoryExtractor.js"></script>
+  <script src="popup.js"></script>
+</body>
+</html>

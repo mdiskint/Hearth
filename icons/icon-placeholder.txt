@@ -1,0 +1,19 @@
+PLACEHOLDER ICONS
+
+For now, these are text placeholders. You'll need to create actual PNG icons:
+
+icon16.png - 16x16 pixels
+icon48.png - 48x48 pixels  
+icon128.png - 128x128 pixels
+
+Recommended design:
+- Hearth flame symbol (🔥) on gradient background
+- Colors: #667eea to #764ba2 gradient
+- Simple, clean design
+
+You can create these using:
+1. Figma/Canva (easiest)
+2. GIMP/Photoshop
+3. Online icon generators
+
+For testing, you can skip icons initially - Chrome will use default.

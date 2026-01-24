@@ -1,0 +1,63 @@
+{
+  "manifest_version": 3,
+  "name": "Hearth",
+  "version": "0.1.0",
+  "description": "AI that adapts to you, not averages. Personalized context injection for ChatGPT, Claude, and Gemini.",
+  
+  "permissions": [
+    "storage",
+    "unlimitedStorage",
+    "activeTab"
+  ],
+  
+  "host_permissions": [
+    "https://chat.openai.com/*",
+    "https://chatgpt.com/*",
+    "https://claude.ai/*",
+    "https://gemini.google.com/*",
+    "https://wkfwtivvhwyjlkyrikeu.supabase.co/*",
+    "https://api.openai.com/*"
+  ],
+  
+  "action": {
+    "default_popup": "popup/popup.html"
+  },
+  
+  "content_scripts": [
+    {
+      "matches": [
+        "https://chat.openai.com/*",
+        "https://chatgpt.com/*",
+        "https://claude.ai/*",
+        "https://gemini.google.com/*"
+      ],
+      "js": [
+        "utils/platforms.js",
+        "utils/embeddings.js",
+        "utils/supabaseSync.js",
+        "storage/storage.js",
+        "content/injector.js",
+        "content/content.js"
+      ],
+      "run_at": "document_end"
+    }
+  ],
+  
+  "background": {
+    "service_worker": "background.js"
+  },
+
+  "web_accessible_resources": [{
+    "resources": [
+      "content/fetch-interceptor.js",
+      "content-script/conversationMonitor.js",
+      "utils/modelRouter.js"
+    ],
+    "matches": [
+      "https://chat.openai.com/*",
+      "https://chatgpt.com/*",
+      "https://claude.ai/*",
+      "https://gemini.google.com/*"
+    ]
+  }]
+}
