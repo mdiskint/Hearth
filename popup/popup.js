@@ -49,6 +49,8 @@ function setupEventListeners() {
 
   // Heat slider
   document.getElementById('memory-heat').addEventListener('input', updateHeatValue);
+document.getElementById('extract-now-btn').addEventListener('click', extractNow);
+  document.getElementById('extract-now-header-btn').addEventListener('click', extractNow);
 
   // Memory type change (show/hide reward fields)
   document.getElementById('memory-type').addEventListener('change', onMemoryTypeChange);
@@ -312,7 +314,7 @@ function showResult(opspec, summary) {
   document.getElementById('opspec-identity').textContent = opspec.identity;
   document.getElementById('opspec-communication').textContent = opspec.communication;
   document.getElementById('opspec-execution').textContent = opspec.execution;
-  document.getElementById('opspec-balance').textContent = opspec.balanceCheck;
+  document.getElementById('opspec-balance').textContent = opspec.balanceProtocol || opspec.balanceCheck || '';
   
   const constraintsList = document.getElementById('opspec-constraints');
   constraintsList.innerHTML = '';
@@ -881,5 +883,38 @@ async function invalidateMemory(id) {
     await loadMemories();
   } catch (error) {
     alert(`Error invalidating memory: ${error.message}`);
+  }
+}
+async function extractNow() {
+  try {
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (!tab) {
+      alert('No active tab found');
+      return;
+    }
+    const supportedPlatforms = ['chat.openai.com', 'chatgpt.com', 'claude.ai', 'gemini.google.com'];
+    const url = new URL(tab.url);
+    if (!supportedPlatforms.some(platform => url.hostname.includes(platform))) {
+      alert('Please navigate to ChatGPT, Claude, or Gemini to extract memories');
+      return;
+    }
+    await chrome.tabs.sendMessage(tab.id, { type: 'EXTRACT_NOW' });
+    const btns = [
+      document.getElementById('extract-now-btn'),
+      document.getElementById('extract-now-header-btn')
+    ].filter(Boolean);
+    btns.forEach(btn => {
+      btn.textContent = '⚡ Extracting...';
+      btn.disabled = true;
+    });
+    setTimeout(() => {
+      btns.forEach(btn => {
+        btn.textContent = '⚡ Extract Now';
+        btn.disabled = false;
+      });
+    }, 2000);
+  } catch (error) {
+    console.error('Extract Now error:', error);
+    alert('Error triggering extraction. Make sure you have an active conversation.');
   }
 }

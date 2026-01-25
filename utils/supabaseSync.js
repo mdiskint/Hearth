@@ -14,6 +14,29 @@ class SupabaseSync {
     };
   }
 
+  /**
+   * Get updated timestamp from memory (handles both camelCase and snake_case)
+   */
+  getUpdatedTime(memory) {
+    const ts = memory.updated_at || memory.updatedAt;
+    return ts ? new Date(ts).getTime() : 0;
+  }
+
+  /**
+   * Normalize memory to have both camelCase and snake_case timestamps
+   */
+  normalizeMemory(memory) {
+    const createdAt = memory.created_at || memory.createdAt || new Date().toISOString();
+    const updatedAt = memory.updated_at || memory.updatedAt || new Date().toISOString();
+    return {
+      ...memory,
+      createdAt,
+      updatedAt,
+      created_at: createdAt,
+      updated_at: updatedAt
+    };
+  }
+
   async pushMemory(memory) {
     try {
       // Only send fields that exist in Supabase schema (whitelist approach)
@@ -87,7 +110,8 @@ class SupabaseSync {
 
       const memories = await response.json();
       console.log(`Pulled ${memories.length} memories from Supabase`);
-      return memories;
+      // Normalize timestamps to have both camelCase and snake_case
+      return memories.map(m => this.normalizeMemory(m));
     } catch (error) {
       console.error('Error pulling memories:', error);
       throw error;
@@ -98,7 +122,9 @@ class SupabaseSync {
     try {
       console.log('Starting sync...');
 
-      const { memories: localMemories = [] } = await chrome.storage.local.get('memories');
+      const { memories: rawLocalMemories = [] } = await chrome.storage.local.get('memories');
+      // Normalize local memories to ensure consistent timestamps
+      const localMemories = rawLocalMemories.map(m => this.normalizeMemory(m));
       const remoteMemories = await this.pullAllMemories();
 
       const localMap = new Map(localMemories.map(m => [m.id, m]));
@@ -113,8 +139,8 @@ class SupabaseSync {
         if (!remote) {
           toPush.push(local);
         } else {
-          const localTime = new Date(local.updated_at).getTime();
-          const remoteTime = new Date(remote.updated_at).getTime();
+          const localTime = this.getUpdatedTime(local);
+          const remoteTime = this.getUpdatedTime(remote);
 
           if (localTime > remoteTime) {
             toPush.push(local);

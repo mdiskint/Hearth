@@ -51,7 +51,10 @@
     "resources": [
       "content/fetch-interceptor.js",
       "content-script/conversationMonitor.js",
-      "utils/modelRouter.js"
+      "utils/modelRouter.js",
+      "utils/scout/scoutAnalyzer.js",
+      "utils/scout/behavioralVerbs.js",
+      "utils/scout/confidenceScorer.js"
     ],
     "matches": [
       "https://chat.openai.com/*",

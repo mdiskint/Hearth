@@ -1,33 +1,34 @@
-# 🔥 Hearth - Personalized AI Context Injection
+# 🔥 Hearth - AI Personalization Through Behavioral Patterns
 
-**What Kind of Human Are You?**
+**Personalization IS Alignment**
 
-Hearth is a Chrome extension that makes AI adapt to *you*, not averages. Answer 15 quick questions and Hearth builds an Operating Specification (OpSpec) that reshapes how ChatGPT, Claude, and Gemini respond to you.
+Most AI systems try to align to an "average human" - a statistical fiction that represents no actual person. Hearth takes a different approach: it learns how *you* think, extracts behavioral patterns from your interactions, and makes AI adapt to your cognitive operating system.
 
-## 🎯 What It Does
+## What It Does
 
-- **Personality Quiz**: 15 questions that feel like a fun personality test
-- **OpSpec Generation**: Automatically generates your personalized Operating Specification
-- **Context Injection**: Prepends your OpSpec to every message you send
+Hearth is a Chrome extension that learns how you think by watching you work, then makes ChatGPT, Claude, and Gemini adapt to your cognitive operating system:
+
+- **Operating Specification**: 15-question quiz generates your initial cognitive profile
+- **Automatic Memory Extraction**: Learns from your conversations in real-time as you use AI
+- **Import Past Conversations**: Bring your history from Claude, ChatGPT, or other platforms
+- **Manual Memory Curation**: Add, edit, or refine specific facts, values, and patterns
+- **Context Injection**: Automatically prepends your OpSpec and relevant memories to every message
 - **Multi-Platform**: Works across ChatGPT, Claude, and Gemini
 - **Privacy-First**: Everything stored locally in your browser
 
-## 📦 Phase 1 Features
+## Current Features
 
-✅ 15-question personality quiz  
-✅ OpSpec generation from quiz answers  
-✅ Context injection (prepends OpSpec to messages)  
-✅ Multi-platform support (ChatGPT, Claude, Gemini)  
+✅ Personality quiz that generates your Operating Specification  
+✅ **Automatic memory extraction** - learns from your conversations as you chat  
+✅ **Import conversations** from Claude, ChatGPT, Gemini, or other AI platforms  
+✅ Manual memory creation, editing, and deletion  
+✅ Memory organization by type (fact/value/pattern)  
+✅ Tagging by life domain (Work, Creative, Self, etc.)  
+✅ Tagging by emotional state (Joy, Anxiety, Curiosity, etc.)  
+✅ Automatic context injection across platforms  
 ✅ Dashboard with enable/disable toggle  
-✅ Retake quiz anytime  
 
-🚧 Coming in Phase 2:  
-- Memory CRUD (create/edit/delete memories)
-- Semantic retrieval with embeddings
-- Heat-gating for emotional intensity matching
-- Memory validation states
-
-## 🚀 Installation
+## Installation
 
 ### 1. Load the Extension
 
@@ -51,189 +52,186 @@ Hearth is a Chrome extension that makes AI adapt to *you*, not averages. Answer 
 4. Review your generated OpSpec
 5. Click "Let's go!" to activate
 
-## 🎮 How to Use
+## How to Use
 
 ### Basic Usage
 
 1. Go to ChatGPT, Claude, or Gemini
-2. You'll see a small "🔥 Hearth Active" indicator in the bottom right
+2. You'll see a small "🔥 Hearth Active" indicator
 3. Type your message as normal
-4. Hearth automatically prepends your OpSpec before sending
+4. Hearth automatically:
+   - Extracts facts, values, and patterns from the conversation
+   - Prepends your OpSpec and relevant memories to your message
+   - Learns how you think and work over time
 5. The AI responds based on your personalized context
+
+**You don't need to do anything special.** Just use AI normally. Hearth watches your conversations and builds your memory bank automatically. The more you use it, the better it understands your cognitive patterns.
+
+### How Memories Work
+
+Hearth builds your memory bank through three channels:
+
+**1. Automatic Extraction (Recommended)**
+
+As you use ChatGPT, Claude, or Gemini with Hearth enabled, the system automatically extracts:
+- Facts about you and your context
+- Values and preferences you express
+- Behavioral patterns in how you work and think
+
+This happens in the background. Just use AI normally and Hearth learns from your interactions.
+
+**2. Import Conversations**
+
+Already have conversation history with Claude, ChatGPT, or other AI platforms?
+1. Click Hearth icon → Dashboard
+2. Click "Import Conversations"
+3. Upload your chat history (supports Claude exports, ChatGPT JSON, plain text)
+4. Hearth extracts memories from past conversations
+
+**3. Manual Curation**
+
+Want to add something specific or refine what Hearth extracted?
+1. Click Hearth icon → Dashboard
+2. Click "Add Memory"
+3. Choose memory type:
+   - **Fact**: Concrete information ("I'm a law student")
+   - **Value**: What matters to you ("I prefer direct feedback")
+   - **Pattern**: How you think/behave ("When stuck, I build rather than plan")
+4. Tag with life domain and emotional state (optional)
+5. Save
+
+You can edit or delete any memory (automatic or manual) from the dashboard.
 
 ### Managing Your OpSpec
 
 **View/Edit:**
-- Click the Hearth icon → Dashboard
+- Click Hearth icon → Dashboard
 - See your OpSpec summary
-- Click "View/Edit OpSpec" to see the full version
+- Click "View/Edit OpSpec" for full version
 
 **Retake Quiz:**
-- Click the Hearth icon → Dashboard
-- Scroll down and click "Retake personality quiz"
-- Your new answers will generate a fresh OpSpec
+- Dashboard → "Retake personality quiz"
+- New answers generate fresh OpSpec
 
 **Disable/Enable:**
-- Click the Hearth icon → Dashboard
-- Toggle "Enable context injection" on/off
+- Toggle "Enable context injection" in Dashboard
 
-### Settings
+## How It Works
 
-**Enable context injection**: Turn Hearth on/off globally
+Hearth's architecture is built on a simple insight: most AI memory systems organize around *what* you talked about (topics, entities, preferences). Hearth organizes around *how* you operate.
 
-**Show injected context**: When enabled, you'll see the OpSpec prepended to your message (useful for debugging)
+**Memory Extraction**
 
-## 🧪 Testing
+As you interact with Claude, ChatGPT, or Gemini, Hearth continuously extracts:
+- **Facts**: Concrete details about your context and situation
+- **Values**: What you care about, what matters in decisions
+- **Patterns**: How you approach problems, build momentum, or recover from stuckness
 
-### Test the Quiz
+You can also import past conversations or manually add memories, but the automatic extraction is what makes the system learn your actual cognitive patterns over time.
 
-1. Click Hearth icon
-2. Go through the quiz
-3. Try different answer combinations
-4. Check that the generated OpSpec makes sense
+**The Three-Layer System:**
 
-### Test Injection
+**The Hearth** retrieves your memories using semantic similarity and generates a baseline response - the kind of answer that would work for most people. This is the reference point.
 
-1. Go to claude.ai
-2. Open DevTools (F12) → Console
-3. Type a message in Claude
-4. Look for `Hearth: OpSpec injected` in console
-5. Check that your message now includes `[HEARTH CONTEXT]` at the top
+**The Scout** analyzes retrieved memories for behavioral invariants - patterns in how you process uncertainty, build momentum, recover from stuckness, or make decisions. When memories about apartment hunting and career decisions both appear, most systems see two separate topics. The Scout sees: "In both cases, you spiraled by collecting endless options without narrowing. The noun changed, but the verb stayed the same."
 
-### Test Multi-Select Questions
+**The Judge** applies these behavioral patterns to new contexts. If you broke through stuckness on one project by externalizing abstraction into spatial form, the Judge might suggest: "This feels stuck - what if you made it spatial instead of staying in writing mode?"
 
-- Q3, Q4, Q5, Q6, Q10, Q11, Q12, Q15 allow multiple selections
-- Try selecting multiple options
-- Verify they all save correctly
+The Scout's pattern recognition is probabilistic - it surfaces confidence levels (high/medium/low) and adjusts suggestions accordingly. High confidence means proven leverage. Low confidence means speculative synthesis. Both have value.
 
-### Test Result Screen
+**Current Implementation:** The OpSpec, automatic memory extraction, and memory injection system are fully functional. The Scout architecture is the theoretical framework guiding development of semantic retrieval and behavioral pattern extraction (coming in future updates).
 
-- Complete the quiz
-- Check that the personality archetype displays
-- Check that highlights show correctly
-- Toggle "See Full Operating Specification"
-- Verify all sections render properly
+## What's Next
 
-## 🏗️ Project Structure
+**Semantic Retrieval**
+- Generate embeddings for each memory
+- Only inject most relevant memories based on query
+- Reduce token bloat, improve signal
+
+**Heat-Gating**
+- Match memory depth to conversation intensity
+- High-stakes memories surface in high-stakes moments
+- Light memories stay light
+
+**Behavioral Pattern Extraction**
+- Automatic detection of action invariants
+- Cross-domain pattern application
+- Confidence-calibrated suggestions
+
+**Validation & Trust Scoring**
+- Track which memories prove useful
+- Prioritize validated patterns
+- Learn what works for you over time
+
+## Project Structure
 
 ```
 hearth/
 ├── manifest.json           # Extension config
 ├── background.js           # Background service worker
 ├── popup/
-│   ├── popup.html         # Quiz UI
+│   ├── popup.html         # Dashboard UI
 │   ├── popup.css          # Styling
-│   └── popup.js           # Quiz logic
+│   └── popup.js           # Quiz & memory logic
 ├── content/
 │   ├── content.js         # Main content script
-│   └── injector.js        # OpSpec injection logic
+│   └── injector.js        # Context injection
 ├── utils/
 │   ├── platforms.js       # Platform detection
 │   ├── quiz-questions.js  # 15 questions
-│   └── opspec-generator.js # Answer → OpSpec conversion
-├── storage/
-│   └── storage.js         # LocalStorage wrapper
-└── icons/
-    └── (placeholder)      # Need to add actual icons
+│   └── opspec-generator.js # OpSpec generation
+└── storage/
+    └── storage.js         # LocalStorage wrapper
 ```
 
-## 🐛 Known Issues & Limitations
-
-### Icons
-- Currently using placeholders
-- Chrome will show default icon until you add PNG files
-- See `icons/icon-placeholder.txt` for instructions
-
-### Platform Detection
-- Selectors may break if ChatGPT/Claude/Gemini update their UI
-- If injection stops working, check console for errors
-- Selectors are in `utils/platforms.js`
-
-### Injection Timing
-- Currently injects on button click or Enter key
-- May occasionally miss if platform handles submission differently
-- Refresh the page if injection seems stuck
-
-## 🔧 Development
+## Development
 
 ### Debugging
 
 **Content Script:**
 - Open DevTools on ChatGPT/Claude/Gemini
 - Check Console for `Hearth:` logs
-- Verify OpSpec injection is happening
+- Verify OpSpec injection
 
 **Popup:**
 - Right-click Hearth icon → Inspect popup
-- DevTools will open for the popup
-- Debug quiz logic, storage, etc.
+- Debug quiz logic and memory management
 
 **Background Script:**
 - Go to `chrome://extensions/`
 - Click "Inspect views: background page"
-- Debug background worker
 
-### Common Issues
+### Testing Injection
 
-**Quiz not saving:**
-- Check DevTools → Application → Storage → Local Storage
-- Verify `chrome.storage.local` has your data
+1. Go to claude.ai
+2. Open DevTools (F12) → Console
+3. Type a message
+4. Look for `Hearth: OpSpec injected` in console
+5. Verify `[HEARTH CONTEXT]` prepends your message
 
-**Injection not working:**
-- Check if platform was detected: Look for `Hearth: Detected [Platform]` in console
-- Verify input field selector is correct
-- Try typing a message and hitting Enter
+## Known Issues
 
-**OpSpec not generating:**
-- Check all 15 questions were answered
-- Open popup DevTools and check for errors
-- Verify `opspec-generator.js` is loaded
+**Platform Selectors**
+- May break if ChatGPT/Claude/Gemini update their UI
+- Check `utils/platforms.js` if injection stops working
 
-## 📝 Next Steps (Phase 2)
+**Memory Token Limit**
+- All memories currently inject (no smart filtering yet)
+- Keep under 20 memories until semantic retrieval ships
+- Individual memories capped at 500 characters
 
-1. **Memory System**
-   - Add memory CRUD UI
-   - Implement storage for user memories
-   - Build memory list/edit interface
+**Injection Timing**
+- Injects on button click or Enter key
+- Refresh page if injection seems stuck
 
-2. **Semantic Retrieval**
-   - Add embedding generation
-   - Implement cosine similarity search
-   - Build retrieval scoring system
+## License
 
-3. **Heat-Gating**
-   - Add heat calculation logic
-   - Implement intensity matching
-   - Build heat-based retrieval filters
+This Chrome extension is open source under the MIT License - use it, modify it, learn from it.
 
-4. **Validation States**
-   - Add validation UI
-   - Track memory confidence
-   - Implement validation lifecycle
+The underlying personalization architecture and methods described in this README (Scout/Hearth/Judge system, behavioral pattern extraction, cross-domain application of action invariants) are proprietary and subject to pending intellectual property protections.
 
-## 🎨 Design Philosophy
-
-**The quiz should feel fun, not clinical.**
-- Personality test energy, not therapy intake
-- Clear visual design with emojis
-- Fast, engaging flow
-
-**The OpSpec should feel personal.**
-- Generated prose, not form fields
-- Reflects actual preferences
-- Readable and auditable
-
-**Injection should be invisible (or visible for debugging).**
-- Seamless integration with platforms
-- No UI disruption
-- Easy to toggle on/off
-
-## 📄 License
-
-MIT - Built by Michael Diskint as part of Hearth AI research
+Built by Michael Diskint as part of Hearth AI research.
 
 ---
 
-**Questions or issues?** Check the console logs, inspect storage, or retake the quiz to regenerate your OpSpec.
-
-**Ready to build Phase 2?** The memory system awaits!
+**The Core Thesis:** You can't align AI to an "average human" because no individual represents that statistical mean. Personalization isn't a feature layer - it's the fundamental unit of alignment. Hearth is an experiment in what happens when you take that seriously.

@@ -201,6 +201,346 @@
     return 'COLD';
   }
 
+  // ============== Scout: Behavioral Verb Patterns (inline for page context) ==============
+
+  /**
+   * Behavioral verb patterns detect HOW users do things (behavioral invariants),
+   * not WHAT they've done (content/nouns).
+   */
+  const BEHAVIORAL_VERB_PATTERNS = {
+    decision_spiral: {
+      patterns: [
+        /spiral(ing|ed|s)?\s*(by|via|through)?\s*(collect|gather|accumul)/i,
+        /too many (options|choices|possibilities)/i,
+        /can't (narrow|choose|pick|decide)/i,
+        /keep adding (more|options|alternatives)/i,
+        /analysis paralysis/i,
+        /endless (research|comparison|options)/i,
+        /overwhelmed by (choice|options|possibilities)/i,
+        /stuck in (options|decision|choosing)/i,
+        /comparing (everything|endlessly|forever)/i,
+        /option (overload|paralysis|fatigue)/i
+      ],
+      verb: 'spirals via option-accumulation',
+      application: 'needs constraint to decide',
+      queryBridges: [
+        /should I/i, /can't decide/i, /stuck/i, /options/i,
+        /which (one|to choose|should)/i, /torn between/i, /weighing/i, /pros and cons/i
+      ]
+    },
+    momentum_through_building: {
+      patterns: [
+        /break(s|ing)?\s*(through|out)?\s*(by|via|through)?\s*(build|mak|creat)/i,
+        /momentum (through|via|by) (building|making|creating)/i,
+        /action over planning/i,
+        /build(ing)? (to|for) (think|understand|clarity)/i,
+        /prototype (first|to think)/i,
+        /learn(s|ed|ing)? by (doing|building|making)/i,
+        /make (it|something) (concrete|real|tangible)/i,
+        /stop planning.*(start|just) (build|do|make)/i,
+        /hands.?on (learn|approach|process)/i,
+        /tangible (progress|output|result)/i
+      ],
+      verb: 'builds momentum through making',
+      application: 'action over planning',
+      queryBridges: [
+        /stuck/i, /can't start/i, /procrastinat/i, /not (making|seeing) progress/i,
+        /how (do I|to) (begin|start)/i, /spinning/i, /planning too/i
+      ]
+    },
+    externalization_for_clarity: {
+      patterns: [
+        /external(iz|is)(e|ed|es|ing)/i,
+        /spatial (form|layout|representation)/i,
+        /visual(iz|is)(e|ed|ing)/i,
+        /draw(ing)? (it )?(out|up)/i,
+        /whiteboard/i,
+        /diagram(ming|med)?/i,
+        /map(ping|ped)? (it |things )?(out|up)/i,
+        /make (it |things )?(visible|concrete|tangible)/i,
+        /see (it |things )?laid out/i,
+        /physical (representation|form|space)/i,
+        /post.?it/i,
+        /sticky notes/i,
+        /spread.*(out|around)/i
+      ],
+      verb: 'externalizes to clarify',
+      application: 'make abstract concrete',
+      queryBridges: [
+        /confused/i, /complex/i, /can't understand/i, /too abstract/i,
+        /hard to (grasp|follow|see)/i, /overwhelming/i, /messy/i, /tangled/i
+      ]
+    },
+    constraint_as_liberation: {
+      patterns: [
+        /constraint(s)? (as|for|bring|create) (liberation|freedom|momentum)/i,
+        /artificial (limit|constraint|deadline|boundary)/i,
+        /limit(s|ing|ed)? (to|for) (focus|clarity|momentum)/i,
+        /deadline (helps|works|creates)/i,
+        /box(es|ing)? (self|myself|in)/i,
+        /narrow(ed|ing)? (focus|scope|options)/i,
+        /less (options|choice) (helps|works|better)/i,
+        /thrive(s)? (with|under) (constraint|limit|pressure)/i,
+        /structure (helps|creates|brings)/i,
+        /rules (help|create|bring)/i,
+        /boundaries (help|create|bring)/i
+      ],
+      verb: 'gains momentum through constraint',
+      application: 'add artificial limits',
+      queryBridges: [
+        /too many/i, /overwhelmed/i, /no direction/i, /scattered/i,
+        /unfocused/i, /everywhere at once/i, /can't focus/i, /where to start/i
+      ]
+    },
+    avoidance_through_research: {
+      patterns: [
+        /avoid(ing|ance)?\s*(through|via|by)?\s*(research|prep|learn)/i,
+        /delay(s|ed|ing)?\s*(through|via|by)?\s*(research|prep|learn)/i,
+        /endless (preparation|research|learning)/i,
+        /not ready (yet|to)/i,
+        /need(s)? (more|additional) (info|research|prep)/i,
+        /one more (article|book|course|video)/i,
+        /still (researching|learning|preparing)/i,
+        /knowledge (hoarding|collecting)/i,
+        /preparation (loop|spiral|trap)/i,
+        /afraid to (start|act|do) (without|until)/i
+      ],
+      verb: 'delays through endless preparation',
+      application: 'act with incomplete info',
+      queryBridges: [
+        /not ready/i, /need more (info|research)/i, /research/i, /prepare/i,
+        /should I (learn|study|read) (more|first)/i, /don't know enough/i, /before I (start|begin)/i
+      ]
+    },
+    recovery_through_isolation: {
+      patterns: [
+        /recover(s|y|ed|ing)?\s*(through|via|by)?\s*(isolation|alone|solitude)/i,
+        /recharge(s|d|ing)?\s*(alone|by myself|in solitude)/i,
+        /need(s)? (to be |time )?(alone|solitude|space)/i,
+        /introvert(ed)?/i,
+        /social(ly)? drain(ed|ing|s)/i,
+        /people exhaust(s|ed|ing)?/i,
+        /alone time/i,
+        /quiet (time|space|place)/i,
+        /withdraw(n|ing|s)? to (recharge|recover)/i,
+        /hermit (mode|time)/i
+      ],
+      verb: 'recovers through isolation',
+      application: 'protect recovery time',
+      queryBridges: [
+        /exhausted/i, /drained/i, /need space/i, /overwhelmed/i,
+        /too much (people|social)/i, /tired/i, /burned out/i, /depleted/i
+      ]
+    },
+    recovery_through_connection: {
+      patterns: [
+        /recover(s|y|ed|ing)?\s*(through|via|by)?\s*(connect|talk|people)/i,
+        /process(es|ed|ing)?\s*(through|by|via)?\s*talk(ing)?/i,
+        /need(s)? to (talk|vent|share|connect)/i,
+        /extrovert(ed)?/i,
+        /people (energize|recharge|help)/i,
+        /talk(ing)? (it )?(out|through)/i,
+        /verbal process/i,
+        /think(s|ing)? (out loud|by talking)/i,
+        /sound(ing)? board/i,
+        /need(s)? (a|someone to) (listen|hear|talk)/i
+      ],
+      verb: 'recovers through connection',
+      application: 'facilitate talking',
+      queryBridges: [
+        /lonely/i, /processing/i, /need to talk/i, /isolated/i,
+        /stuck in (my|own) head/i, /no one to (talk|listen)/i, /want to (share|vent|discuss)/i
+      ]
+    },
+    closure_seeking: {
+      patterns: [
+        /seek(s|ing)? (rapid |quick )?(closure|resolution)/i,
+        /need(s)? to know (now|immediately|right away)/i,
+        /can't (stand|handle|tolerate) uncertainty/i,
+        /hate(s)? (waiting|uncertainty|not knowing)/i,
+        /need(s)? (clear |definitive )?(answer|decision|resolution)/i,
+        /closure (need|seeking|required)/i,
+        /open loop(s)? (stress|bother|anxiety)/i,
+        /unresolved (stress|bother|anxiety)/i,
+        /must (finish|complete|close|resolve)/i,
+        /wrap(ping)? (it |things )?(up|off)/i
+      ],
+      verb: 'seeks rapid closure',
+      application: 'provide clear next steps',
+      queryBridges: [
+        /need to know/i, /uncertainty/i, /waiting/i, /when will/i,
+        /what happens (next|if)/i, /can't (wait|stand) (not knowing|uncertainty)/i, /open (loop|ended|question)/i
+      ]
+    }
+  };
+
+  /**
+   * Detect behavioral patterns in a memory's content
+   */
+  function detectPatternsInMemory(content) {
+    if (!content || typeof content !== 'string') return [];
+    const matches = [];
+    for (const [patternId, config] of Object.entries(BEHAVIORAL_VERB_PATTERNS)) {
+      for (const pattern of config.patterns) {
+        if (pattern.test(content)) {
+          matches.push({ patternId, verb: config.verb, application: config.application });
+          break;
+        }
+      }
+    }
+    return matches;
+  }
+
+  /**
+   * Check if query matches a pattern's query bridges
+   */
+  function queryMatchesBridges(query, patternId) {
+    if (!query || !patternId) return false;
+    const config = BEHAVIORAL_VERB_PATTERNS[patternId];
+    if (!config) return false;
+    for (const bridge of config.queryBridges) {
+      if (bridge.test(query)) return true;
+    }
+    return false;
+  }
+
+  /**
+   * Calculate recency in days for a memory
+   */
+  function calculateRecencyDays(memory) {
+    if (!memory) return Infinity;
+    const dateStr = memory.createdAt || memory.updatedAt;
+    if (!dateStr) return Infinity;
+    const memoryDate = new Date(dateStr).getTime();
+    return Math.round((Date.now() - memoryDate) / (24 * 60 * 60 * 1000));
+  }
+
+  /**
+   * Calculate confidence score for a behavioral pattern
+   */
+  function calculateConfidence(instances, queryRelevance) {
+    if (!instances || instances.length === 0) return { level: 'LOW', score: 0 };
+    let score = 0;
+
+    // Instance count (0.05 - 0.35)
+    if (instances.length >= 4) score += 0.35;
+    else if (instances.length >= 3) score += 0.25;
+    else if (instances.length >= 2) score += 0.15;
+    else score += 0.05;
+
+    // Cross-domain bonus (0 - 0.25)
+    const domains = new Set(instances.map(i => i.domain).filter(Boolean));
+    if (domains.size >= 3) score += 0.25;
+    else if (domains.size >= 2) score += 0.15;
+
+    // Recency (0 - 0.15)
+    const recentInstances = instances.filter(i => i.recencyDays < 30);
+    if (recentInstances.length >= 2) score += 0.15;
+    else if (recentInstances.length >= 1) score += 0.08;
+
+    // Query relevance (0 - 0.25)
+    score += (queryRelevance || 0) * 0.25;
+
+    // Map to level
+    let level;
+    if (score >= 0.70) level = 'HIGH';
+    else if (score >= 0.40) level = 'MEDIUM';
+    else level = 'LOW';
+
+    return { level, score: Math.round(score * 100) / 100 };
+  }
+
+  /**
+   * Main Scout analysis function
+   */
+  function analyzeWithScout(memories, queryMessage) {
+    if (!memories || memories.length === 0) return [];
+
+    const patternMatches = {};
+
+    // Step 1: Detect patterns in all memories
+    for (const memory of memories) {
+      const content = memory.content || '';
+      const detected = detectPatternsInMemory(content);
+
+      for (const match of detected) {
+        if (!patternMatches[match.patternId]) {
+          patternMatches[match.patternId] = {
+            patternId: match.patternId,
+            verb: match.verb,
+            application: match.application,
+            instances: [],
+            domains: new Set()
+          };
+        }
+        patternMatches[match.patternId].instances.push({
+          content,
+          domain: memory.domain,
+          createdAt: memory.createdAt,
+          updatedAt: memory.updatedAt,
+          recencyDays: calculateRecencyDays(memory)
+        });
+        if (memory.domain) {
+          patternMatches[match.patternId].domains.add(memory.domain);
+        }
+      }
+    }
+
+    // Step 2: Calculate confidence for each pattern
+    const scoredPatterns = [];
+    for (const [patternId, data] of Object.entries(patternMatches)) {
+      const queryRelevant = queryMatchesBridges(queryMessage, patternId);
+      const queryRelevance = queryRelevant ? 1.0 : 0.0;
+      const confidence = calculateConfidence(data.instances, queryRelevance);
+
+      scoredPatterns.push({
+        patternId,
+        verb: data.verb,
+        application: data.application,
+        domains: Array.from(data.domains),
+        instanceCount: data.instances.length,
+        confidence,
+        queryRelevant
+      });
+    }
+
+    // Step 3: Filter to query-relevant patterns (or fall back to all)
+    let relevantPatterns = scoredPatterns.filter(p => p.queryRelevant);
+    if (relevantPatterns.length === 0) {
+      relevantPatterns = scoredPatterns;
+    }
+
+    // Step 4: Sort by confidence score
+    relevantPatterns.sort((a, b) => b.confidence.score - a.confidence.score);
+
+    // Step 5: Return top 3 meaningful patterns
+    const topPatterns = relevantPatterns.slice(0, 3);
+    return topPatterns.filter(p => p.confidence.level !== 'LOW' || p.instanceCount >= 2);
+  }
+
+  /**
+   * Build Scout analysis section for injection
+   */
+  function buildScoutSection(analysis) {
+    if (!analysis || analysis.length === 0) return '';
+
+    const lines = ['---', '', 'SCOUT ANALYSIS', ''];
+
+    for (const pattern of analysis) {
+      const domainsStr = pattern.domains.length > 0
+        ? pattern.domains.join(', ')
+        : 'General';
+
+      lines.push(`[${pattern.confidence.level}] ${pattern.verb}`);
+      lines.push(`  Observed across: ${domainsStr}`);
+      lines.push(`  Evidence: ${pattern.instanceCount} instance${pattern.instanceCount !== 1 ? 's' : ''}`);
+      lines.push(`  Intervention: ${pattern.application}`);
+      lines.push('');
+    }
+
+    return lines.join('\n');
+  }
+
   // ============== Temporal Filtering ==============
 
   /**
@@ -474,12 +814,101 @@
     }
   }
 
+  // Default content for fields that may be missing from quiz-generated OpSpecs
+  const DEFAULT_COGNITIVE_ARCHITECTURE = `There's a three-step thinking process happening when we work together.
+
+**The Hearth** generates the baseline — the safe, reasonable answer that would work for most people. This is the reference point, the population mean. Memory retrieval happens here using semantic similarity and heat-gating.
+
+**The Scout** receives both your current query and the retrieved memories, then analyzes them for verb patterns — behavioral invariants that show *how* you do things, not just *what* you've done.
+
+The Scout isn't retrieving different memories. It's interpreting the same memories through a different lens.
+
+When memories about apartment hunting and career decisions both appear, most systems see two separate topics. The Scout sees: "In both cases, Michael spiraled by collecting endless options without narrowing. The noun changed (apartment → career), but the verb stayed the same (spiral via option-accumulation)."
+
+The Scout looks for action invariants across contexts: how you process uncertainty, how you build momentum, how you spiral, how you recover, how you decide. These patterns persist even when the content changes completely.
+
+The Scout's pattern recognition is probabilistic. It assesses and explicitly surfaces confidence before the Judge acts:
+
+**High confidence**: The pattern is clear and strongly matches multiple prior instances
+**Medium confidence**: The pattern is plausible and familiar, but the signal is incomplete
+**Low confidence**: The pattern is speculative or weakly supported
+
+This confidence assessment is never resolved silently. It's part of what gets passed to the Judge.
+
+**The Judge** applies the balance protocol and the Scout's confidence to generate novel solutions by applying proven patterns to new contexts.
+
+With high confidence: Apply the action invariant directly. "You break through stuckness by building, not planning. Stop drafting the email—build a demo and send that instead."
+
+With medium confidence: Offer the cross-domain pattern as an option. "You externalized Aurora into spatial form when it was too abstract. This Hearth paper feels stuck—what if you made it spatial too? Or stay in writing mode?"
+
+With low confidence: Surface the speculative connection. "Weak signal, but: you seem to build momentum through constraint. Want to try an artificial constraint here, or does that feel forced?"
+
+Confidence determines whether I'm offering proven leverage or speculative synthesis. Both create value—one through reliability, one through novelty.
+
+When you're stuck and spiraling, I make the world smaller.
+When you're flying and building momentum, I make the world bigger.
+
+This doesn't add new roles or decision loops. It modifies the contract between Scout and Judge only — preserving momentum without false certainty and maintaining your agency through explicit uncertainty.`;
+
+  const DEFAULT_IDENTITY = `I'm a creative experimenter who learns by building. I take creative and professional risks but I'm conservative with money. I learn best through analogies and real-world examples, step-by-step walkthroughs.`;
+
+  const DEFAULT_COMMUNICATION = `Natural and conversational. Comprehensive but tight - complete information, efficiently expressed.`;
+
+  const DEFAULT_EXECUTION = `Give me options and let me decide. Ask before acting when: uncertain about the approach, OR when high-stakes or expensive, OR when first time seeing this type of task. Otherwise execute confidently. Embrace tangents and exploration - always welcome. Know when to suggest taking a break.`;
+
+  const DEFAULT_CONSTRAINTS = [
+    "Never use pure abstraction without grounding",
+    "Never skip steps or assume prior knowledge",
+    "Never sugarcoat feedback - be direct and blunt",
+    "Never use excessive formatting (headers, bullets) unless explicitly requested",
+    "Never use corporate or robotic language",
+    "Never express false confidence when uncertain - say so clearly",
+    "Never decide for me without presenting options",
+    "Don't hedge excessively",
+    "Never act confident while clearly guessing",
+    "Never overwhelm with options without helping choose",
+    "Never use overly formal or robotic language",
+    "Never apologize excessively",
+    "Never use corporate speak and buzzwords",
+    "Never avoid giving direct answers"
+  ];
+
+  const DEFAULT_BALANCE_PROTOCOL = `I'm one of many Hearth instances. We all share the same base model — that's the coordinate system, the population mean. Your OpSpec and memories define how you deviate from that mean. This architecture only works because the deviation is measured against something stable.
+
+The question I'm constantly asking isn't just "does this help you grow?" It's "does this sharpen the deviation or blur it?"
+
+Growth means becoming more distinctively you — high signal-to-noise in the deviation from the mean. You're not trying to be a better version of the average person. You're trying to be more clearly yourself.
+
+Drift happens in two directions: regression toward the generic assistant, or collapse into caricature.
+
+I watch for patterns that suggest drift:
+
+Validating when I should be challenging
+Optimizing for your comfort at the expense of your growth
+Reinforcing patterns that serve my metrics rather than your development
+Becoming an echo chamber instead of a thinking partner
+
+The balance check: does this expand or collapse the space of who you can safely become?
+
+Expansion means more options, more agency, more capability.
+Collapse means narrowing, dependency, or drift.
+
+Growth expands. Drift collapses.`;
+
   /**
    * Build the full injection context with OpSpec and relevant memories
    */
-  function buildInjectionContext(opspec, memories) {
-    const { cognitiveArchitecture, identity, constraints, communication, execution, balanceProtocol } = opspec;
-    const constraintsList = (constraints || []).map((c, i) => `${i + 1}. ${c}`).join('\n');
+  function buildInjectionContext(opspec, memories, scoutAnalysis = null) {
+    // Use saved values or fall back to defaults
+    const cognitiveArchitecture = opspec.cognitiveArchitecture || DEFAULT_COGNITIVE_ARCHITECTURE;
+    const identity = opspec.identity || DEFAULT_IDENTITY;
+    const communication = opspec.communication || DEFAULT_COMMUNICATION;
+    const execution = opspec.execution || DEFAULT_EXECUTION;
+    const constraints = opspec.constraints && opspec.constraints.length > 0 ? opspec.constraints : DEFAULT_CONSTRAINTS;
+    const balanceProtocol = opspec.balanceProtocol || DEFAULT_BALANCE_PROTOCOL;
+
+    // Format constraints as plain list (no dashes)
+    const constraintsList = constraints.join('\n');
 
     // Separate memories by type
     const userMemories = memories.filter(m => USER_MEMORY_TYPES.includes(m.type));
@@ -490,46 +919,61 @@
 
     if (userMemories.length > 0) {
       const userLines = userMemories.map(m => formatMemoryLine(m)).join('\n');
-      memoriesSection += `\n\nUSER MEMORIES (${userMemories.length} most relevant)\n${userLines}`;
+      memoriesSection += `
+
+---
+
+USER MEMORIES (${userMemories.length} most relevant)
+${userLines}`;
     }
 
     if (aiMemories.length > 0) {
       const aiLines = aiMemories.map(m => formatMemoryLine(m)).join('\n');
-      memoriesSection += `\n\nAI MEMORIES (${aiMemories.length} most relevant)\n${aiLines}`;
-    }
-
-    // Build balance protocol section if present
-    let balanceSection = '';
-    if (balanceProtocol) {
-      balanceSection = `
+      memoriesSection += `
 
 ---
 
-### SECTION 4: BALANCE PROTOCOL
-${balanceProtocol}`;
+AI MEMORIES (${aiMemories.length} most relevant)
+${aiLines}`;
     }
 
     return `[HEARTH CONTEXT]
 
-### SECTION 1: THE INTERNAL COUNCIL (Cognitive Architecture)
-${cognitiveArchitecture || ''}
+THE INTERNAL COUNCIL
+
+${cognitiveArchitecture}
 
 ---
 
-### SECTION 2: IDENTITY & PREFERENCES (The "Soul")
+IDENTITY
+
 ${identity}
 
-**Communication Style:**
+---
+
+COMMUNICATION
+
 ${communication}
 
-**Execution Protocol:**
+---
+
+EXECUTION
+
 ${execution}
 
 ---
 
-### SECTION 3: IMMUTABLE CONSTRAINTS (The "Law")
-${constraintsList}${balanceSection}${memoriesSection}
+CONSTRAINTS
 
+${constraintsList}
+
+---
+
+BALANCE PROTOCOL
+
+${balanceProtocol}${memoriesSection}
+
+${scoutAnalysis && scoutAnalysis.length > 0 ? buildScoutSection(scoutAnalysis) : ''}
 [END HEARTH CONTEXT]`;
   }
 
@@ -791,8 +1235,17 @@ ${constraintsList}${balanceSection}${memoriesSection}
 
               console.log('Hearth: Selected', relevantMemories.length, 'memories for injection');
 
-              // Build context with relevant memories
-              const context = buildInjectionContext(hearthData.opspec, relevantMemories);
+              // Scout analysis: detect behavioral patterns in memories
+              const scoutAnalysis = analyzeWithScout(relevantMemories, capturedUserMessage);
+              if (scoutAnalysis.length > 0) {
+                console.log(`Hearth: Scout analysis found ${scoutAnalysis.length} patterns:`,
+                  scoutAnalysis.map(p => `${p.confidence.level} ${p.verb}`).join(', '));
+              } else {
+                console.log('Hearth: Scout analysis found no behavioral patterns');
+              }
+
+              // Build context with relevant memories and Scout analysis
+              const context = buildInjectionContext(hearthData.opspec, relevantMemories, scoutAnalysis);
 
               // Inject context into request
               if (injectContext(url, body, context)) {
@@ -913,5 +1366,5 @@ ${constraintsList}${balanceSection}${memoriesSection}
     }
   }
 
-  console.log('Hearth: Fetch interceptor active (with heat detection + semantic retrieval + conversation monitoring)');
+  console.log('Hearth: Fetch interceptor active (with heat detection + semantic retrieval + Scout analysis + conversation monitoring)');
 })();
