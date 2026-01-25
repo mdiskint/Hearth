@@ -9,6 +9,7 @@
  * - verb: Human-readable description of the behavior
  * - application: Intervention suggestion for the Judge
  * - queryBridges: Regex patterns indicating this pattern is relevant to current query
+ * - contradictionBridges: Regex patterns indicating counter-evidence to this pattern
  */
 
 const BEHAVIORAL_VERB_PATTERNS = {
@@ -36,6 +37,17 @@ const BEHAVIORAL_VERB_PATTERNS = {
       /torn between/i,
       /weighing/i,
       /pros and cons/i
+    ],
+    contradictionBridges: [
+      /decided quickly/i,
+      /made (a |the )?decision (without|easily|fast|quickly)/i,
+      /didn't overthink/i,
+      /went with (my |first )?(gut|instinct)/i,
+      /narrowed (it |options )?(down )?immediately/i,
+      /no (hesitation|indecision)/i,
+      /chose (quickly|easily|confidently|immediately)/i,
+      /just (picked|chose|decided)/i,
+      /trusted my (gut|instinct|first choice)/i
     ]
   },
 
@@ -62,6 +74,16 @@ const BEHAVIORAL_VERB_PATTERNS = {
       /how (do I|to) (begin|start)/i,
       /spinning/i,
       /planning too/i
+    ],
+    contradictionBridges: [
+      /planned (carefully|thoroughly|extensively|first)/i,
+      /outlined everything (before|first)/i,
+      /didn't (start|build|make) until/i,
+      /research(ed)? (extensively|thoroughly) (before|first)/i,
+      /waited (until|to) (plan|outline|research|understand)/i,
+      /thought it through (first|before)/i,
+      /planned (before|then) (built|made|acted)/i,
+      /planning (helped|worked|was key)/i
     ]
   },
 
@@ -92,6 +114,15 @@ const BEHAVIORAL_VERB_PATTERNS = {
       /overwhelming/i,
       /messy/i,
       /tangled/i
+    ],
+    contradictionBridges: [
+      /figured it out (in my head|mentally|internally)/i,
+      /didn't need to (write|draw|visualize)/i,
+      /kept it (all )?in (my )?head/i,
+      /thought (it )?through (mentally|internally)/i,
+      /no need (to|for) (diagram|map|draw|visualize)/i,
+      /understood without (writing|drawing|visualizing)/i,
+      /clarity came (mentally|internally|from thinking)/i
     ]
   },
 
@@ -120,6 +151,16 @@ const BEHAVIORAL_VERB_PATTERNS = {
       /everywhere at once/i,
       /can't focus/i,
       /where to start/i
+    ],
+    contradictionBridges: [
+      /constraints (felt|were) (limiting|restrictive|suffocating)/i,
+      /needed (more|full) freedom/i,
+      /rules (held back|blocked|hindered)/i,
+      /thrived (with|in) (freedom|openness|no limits)/i,
+      /better without (constraints|limits|rules|structure)/i,
+      /open.?ended (worked|helped|was better)/i,
+      /removing (constraints|limits) (helped|freed)/i,
+      /too (constrained|limited|restricted)/i
     ]
   },
 
@@ -146,6 +187,16 @@ const BEHAVIORAL_VERB_PATTERNS = {
       /should I (learn|study|read) (more|first)/i,
       /don't know enough/i,
       /before I (start|begin)/i
+    ],
+    contradictionBridges: [
+      /acted (without|with incomplete|before finishing)/i,
+      /started (before|without) (ready|knowing|understanding)/i,
+      /jumped (in|right in)/i,
+      /learned (by doing|as I went|on the job)/i,
+      /figured it out (along the way|as I went)/i,
+      /didn't (need to|) research (first|beforehand)/i,
+      /enough (info|knowledge|preparation)/i,
+      /ready (enough|to act|to start)/i
     ]
   },
 
@@ -173,6 +224,15 @@ const BEHAVIORAL_VERB_PATTERNS = {
       /tired/i,
       /burned out/i,
       /depleted/i
+    ],
+    contradictionBridges: [
+      /recharged (by|through|with) (people|friends|socializing)/i,
+      /felt better after (talking|socializing|being with)/i,
+      /people (energized|recharged|helped) me/i,
+      /needed (company|connection|people) to (recover|feel better)/i,
+      /isolation (made it|felt) worse/i,
+      /being alone (didn't help|felt wrong|made it worse)/i,
+      /social(izing)? (helped|recharged|energized)/i
     ]
   },
 
@@ -199,6 +259,15 @@ const BEHAVIORAL_VERB_PATTERNS = {
       /stuck in (my|own) head/i,
       /no one to (talk|listen)/i,
       /want to (share|vent|discuss)/i
+    ],
+    contradictionBridges: [
+      /processed (it )?(alone|internally|in my head)/i,
+      /didn't need to (talk|vent|share)/i,
+      /figured it out (alone|by myself|on my own)/i,
+      /talking (didn't help|made it worse|was exhausting)/i,
+      /needed (quiet|silence|solitude) to (process|think|recover)/i,
+      /felt better after (being alone|quiet time|solitude)/i,
+      /alone time (helped|was what I needed)/i
     ]
   },
 
@@ -225,6 +294,16 @@ const BEHAVIORAL_VERB_PATTERNS = {
       /what happens (next|if)/i,
       /can't (wait|stand) (not knowing|uncertainty)/i,
       /open (loop|ended|question)/i
+    ],
+    contradictionBridges: [
+      /comfortable (with|in) uncertainty/i,
+      /okay (with|not knowing|waiting)/i,
+      /let it (sit|remain|stay) (open|unresolved)/i,
+      /didn't need (closure|resolution|answers) (right away|immediately)/i,
+      /patient (with|about) (uncertainty|not knowing|waiting)/i,
+      /ambiguity (was fine|didn't bother|was okay)/i,
+      /open.?ended (was fine|felt okay|worked)/i,
+      /embraced (uncertainty|ambiguity|not knowing)/i
     ]
   }
 };
@@ -235,7 +314,8 @@ for (const [patternId, config] of Object.entries(BEHAVIORAL_VERB_PATTERNS)) {
   COMPILED_PATTERNS[patternId] = {
     ...config,
     compiledPatterns: config.patterns,
-    compiledBridges: config.queryBridges
+    compiledBridges: config.queryBridges,
+    compiledContradictionBridges: config.contradictionBridges || []
   };
 }
 
@@ -288,12 +368,76 @@ function queryMatchesBridges(query, patternId) {
   return false;
 }
 
+/**
+ * Detect contradictions to behavioral patterns in a message
+ * @param {string} message - User's message to check for contradictions
+ * @returns {Array<{patternId: string, strength: 'weak'|'normal'|'strong'}>}
+ */
+function detectContradictions(message) {
+  if (!message || typeof message !== 'string') {
+    return [];
+  }
+
+  const contradictions = [];
+
+  for (const [patternId, config] of Object.entries(COMPILED_PATTERNS)) {
+    if (!config.compiledContradictionBridges || config.compiledContradictionBridges.length === 0) {
+      continue;
+    }
+
+    let matchCount = 0;
+    for (const bridge of config.compiledContradictionBridges) {
+      if (bridge.test(message)) {
+        matchCount++;
+      }
+    }
+
+    if (matchCount > 0) {
+      // More matches = stronger contradiction
+      let strength = 'normal';
+      if (matchCount >= 3) strength = 'strong';
+      else if (matchCount === 1) strength = 'weak';
+
+      contradictions.push({
+        patternId,
+        strength,
+        matchCount
+      });
+    }
+  }
+
+  return contradictions;
+}
+
+/**
+ * Check if a message contradicts a specific pattern
+ * @param {string} message - User's message
+ * @param {string} patternId - Pattern ID to check
+ * @returns {boolean}
+ */
+function messageContradictsPattern(message, patternId) {
+  if (!message || !patternId) return false;
+
+  const config = COMPILED_PATTERNS[patternId];
+  if (!config || !config.compiledContradictionBridges) return false;
+
+  for (const bridge of config.compiledContradictionBridges) {
+    if (bridge.test(message)) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
 // Export for module use (not used in page context, but for testing/documentation)
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
     BEHAVIORAL_VERB_PATTERNS,
     COMPILED_PATTERNS,
     detectPatternsInMemory,
-    queryMatchesBridges
+    queryMatchesBridges,
+    detectContradictions,
+    messageContradictsPattern
   };
 }

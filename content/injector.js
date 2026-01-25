@@ -6,6 +6,7 @@ const HearthInjector = {
   settings: null,
   memories: null,
   openaiApiKey: null,
+  patternEvidence: null,  // NEW: Pattern evidence for confidence calibration
 
   async init() {
     this.platform = detectPlatform();
@@ -29,16 +30,18 @@ const HearthInjector = {
 
   async loadData() {
     try {
-      const data = await chrome.storage.local.get(['opspec', 'settings', 'memories', 'openaiApiKey']);
+      const data = await chrome.storage.local.get(['opspec', 'settings', 'memories', 'openaiApiKey', 'patternEvidence']);
       this.opspec = data.opspec;
       this.settings = data.settings || { enabled: true };
       this.memories = data.memories || [];
       this.openaiApiKey = data.openaiApiKey || null;
+      this.patternEvidence = data.patternEvidence || {};  // NEW
 
       console.log('Hearth: Loaded data -',
         'OpSpec:', !!this.opspec,
         'Memories:', this.memories.length,
-        'OpenAI Key:', !!this.openaiApiKey
+        'OpenAI Key:', !!this.openaiApiKey,
+        'Pattern Evidence:', Object.keys(this.patternEvidence).length, 'patterns'  // NEW
       );
     } catch (error) {
       console.error('Hearth: Error loading data:', error);
@@ -76,6 +79,16 @@ const HearthInjector = {
           console.error('Hearth: Failed to save live memory:', error.message);
         }
       }
+
+      // NEW: Handle pattern evidence from fetch interceptor
+      if (event.data.type === 'HEARTH_NEW_EVIDENCE' && event.data.evidence) {
+        try {
+          await this.appendEvidenceBatch(event.data.evidence);
+          console.log('Hearth: Persisted', event.data.evidence.length, 'new evidence records');
+        } catch (error) {
+          console.error('Hearth: Failed to persist evidence:', error.message);
+        }
+      }
     });
 
     // Reload data when storage changes
@@ -99,6 +112,11 @@ const HearthInjector = {
           this.openaiApiKey = changes.openaiApiKey.newValue;
           dataChanged = true;
         }
+        // NEW: Track pattern evidence changes
+        if (changes.patternEvidence) {
+          this.patternEvidence = changes.patternEvidence.newValue;
+          dataChanged = true;
+        }
 
         // Send updated data to fetch interceptor
         if (dataChanged) {
@@ -106,6 +124,50 @@ const HearthInjector = {
         }
       }
     });
+  },
+
+  // NEW: Append evidence records to chrome.storage
+  async appendEvidenceBatch(evidenceArray) {
+    if (!evidenceArray || evidenceArray.length === 0) return;
+
+    const maxPerPattern = 100;  // Pruning limit
+
+    try {
+      const data = await chrome.storage.local.get('patternEvidence');
+      const allEvidence = data.patternEvidence || {};
+
+      for (const evidence of evidenceArray) {
+        if (!allEvidence[evidence.pattern_id]) {
+          allEvidence[evidence.pattern_id] = [];
+        }
+
+        // Add unique ID if not present
+        if (!evidence.id) {
+          evidence.id = `${evidence.pattern_id}_${evidence.polarity}_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
+        }
+
+        // Set timestamp if not present
+        if (!evidence.observed_at) {
+          evidence.observed_at = new Date().toISOString();
+        }
+
+        allEvidence[evidence.pattern_id].push(evidence);
+      }
+
+      // Prune all patterns that exceed limit
+      for (const patternId of Object.keys(allEvidence)) {
+        if (allEvidence[patternId].length > maxPerPattern) {
+          allEvidence[patternId] = allEvidence[patternId]
+            .sort((a, b) => new Date(b.observed_at) - new Date(a.observed_at))
+            .slice(0, maxPerPattern);
+        }
+      }
+
+      await chrome.storage.local.set({ patternEvidence: allEvidence });
+      this.patternEvidence = allEvidence;
+    } catch (error) {
+      console.error('Hearth: Failed to append evidence batch:', error);
+    }
   },
 
   setupFetchInterceptor() {
@@ -182,12 +244,14 @@ const HearthInjector = {
       type: 'HEARTH_DATA',
       opspec: this.opspec,
       memories: this.memories,
-      openaiApiKey: this.openaiApiKey
+      openaiApiKey: this.openaiApiKey,
+      patternEvidence: this.patternEvidence  // NEW
     }, '*');
 
     console.log('Hearth: Data sent to fetch interceptor -',
       'Memories:', this.memories?.length || 0,
-      'Has API Key:', !!this.openaiApiKey
+      'Has API Key:', !!this.openaiApiKey,
+      'Pattern Evidence:', Object.keys(this.patternEvidence || {}).length, 'patterns'  // NEW
     );
   },
 

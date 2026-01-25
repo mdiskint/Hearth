@@ -16,6 +16,7 @@
       console.log('Hearth: Data received via postMessage');
       console.log('Hearth: Memories count:', hearthData.memories?.length || 0);
       console.log('Hearth: Has OpenAI key:', !!hearthData.openaiApiKey);
+      console.log('Hearth: Pattern evidence:', Object.keys(hearthData.patternEvidence || {}).length, 'patterns');
     }
   });
 
@@ -125,6 +126,36 @@
     { pattern: /\b[A-Z]{3,}\b/g, boost: 0.05 }
   ];
 
+  // ============== Confidence Calibration Config (inline for page context) ==============
+
+  /**
+   * Confidence calibration configuration
+   * All thresholds and weights in one place for tuning
+   */
+  const CONFIDENCE_CONFIG = {
+    DECAY: {
+      RECENT_DAYS: 30,
+      STALE_DAYS: 90,
+      DORMANT_DAYS: 120,
+      RECENT_WEIGHT: 1.0,
+      STALE_WEIGHT: 0.5,
+      OLD_WEIGHT: 0.25
+    },
+    CONTRADICTION: {
+      RECENT_DAYS: 14,
+      STRENGTH_MULTIPLIER: { weak: 1.5, normal: 1.75, strong: 2.0 },
+      BASE_PENALTY: 0.15,
+      OVERRIDE_REQUIRES_SUPPORTS: 3
+    },
+    LEVELS: { HIGH: 0.70, MEDIUM: 0.40, LOW: 0.20, DORMANT: 0.10 },
+    SCORING: {
+      INSTANCE_COUNT: { 1: 0.10, 2: 0.20, 3: 0.30, 4: 0.40 },
+      CROSS_DOMAIN: { 2: 0.15, 3: 0.25 },
+      QUERY_RELEVANCE: 0.25,
+      RECENCY_BONUS: 0.15
+    }
+  };
+
   /**
    * Detect the emotional heat/intensity of a query message
    * @param {string} message - The user's message text
@@ -226,6 +257,13 @@
       queryBridges: [
         /should I/i, /can't decide/i, /stuck/i, /options/i,
         /which (one|to choose|should)/i, /torn between/i, /weighing/i, /pros and cons/i
+      ],
+      contradictionBridges: [
+        /decided quickly/i, /made (a |the )?decision (without|easily|fast|quickly)/i,
+        /didn't overthink/i, /went with (my |first )?(gut|instinct)/i,
+        /narrowed (it |options )?(down )?immediately/i, /no (hesitation|indecision)/i,
+        /chose (quickly|easily|confidently|immediately)/i, /just (picked|chose|decided)/i,
+        /trusted my (gut|instinct|first choice)/i
       ]
     },
     momentum_through_building: {
@@ -246,6 +284,12 @@
       queryBridges: [
         /stuck/i, /can't start/i, /procrastinat/i, /not (making|seeing) progress/i,
         /how (do I|to) (begin|start)/i, /spinning/i, /planning too/i
+      ],
+      contradictionBridges: [
+        /planned (carefully|thoroughly|extensively|first)/i, /outlined everything (before|first)/i,
+        /didn't (start|build|make) until/i, /research(ed)? (extensively|thoroughly) (before|first)/i,
+        /waited (until|to) (plan|outline|research|understand)/i, /thought it through (first|before)/i,
+        /planned (before|then) (built|made|acted)/i, /planning (helped|worked|was key)/i
       ]
     },
     externalization_for_clarity: {
@@ -269,6 +313,12 @@
       queryBridges: [
         /confused/i, /complex/i, /can't understand/i, /too abstract/i,
         /hard to (grasp|follow|see)/i, /overwhelming/i, /messy/i, /tangled/i
+      ],
+      contradictionBridges: [
+        /figured it out (in my head|mentally|internally)/i, /didn't need to (write|draw|visualize)/i,
+        /kept it (all )?in (my )?head/i, /thought (it )?through (mentally|internally)/i,
+        /no need (to|for) (diagram|map|draw|visualize)/i, /understood without (writing|drawing|visualizing)/i,
+        /clarity came (mentally|internally|from thinking)/i
       ]
     },
     constraint_as_liberation: {
@@ -290,6 +340,12 @@
       queryBridges: [
         /too many/i, /overwhelmed/i, /no direction/i, /scattered/i,
         /unfocused/i, /everywhere at once/i, /can't focus/i, /where to start/i
+      ],
+      contradictionBridges: [
+        /constraints (felt|were) (limiting|restrictive|suffocating)/i, /needed (more|full) freedom/i,
+        /rules (held back|blocked|hindered)/i, /thrived (with|in) (freedom|openness|no limits)/i,
+        /better without (constraints|limits|rules|structure)/i, /open.?ended (worked|helped|was better)/i,
+        /removing (constraints|limits) (helped|freed)/i, /too (constrained|limited|restricted)/i
       ]
     },
     avoidance_through_research: {
@@ -310,6 +366,12 @@
       queryBridges: [
         /not ready/i, /need more (info|research)/i, /research/i, /prepare/i,
         /should I (learn|study|read) (more|first)/i, /don't know enough/i, /before I (start|begin)/i
+      ],
+      contradictionBridges: [
+        /acted (without|with incomplete|before finishing)/i, /started (before|without) (ready|knowing|understanding)/i,
+        /jumped (in|right in)/i, /learned (by doing|as I went|on the job)/i,
+        /figured it out (along the way|as I went)/i, /didn't (need to|) research (first|beforehand)/i,
+        /enough (info|knowledge|preparation)/i, /ready (enough|to act|to start)/i
       ]
     },
     recovery_through_isolation: {
@@ -330,6 +392,12 @@
       queryBridges: [
         /exhausted/i, /drained/i, /need space/i, /overwhelmed/i,
         /too much (people|social)/i, /tired/i, /burned out/i, /depleted/i
+      ],
+      contradictionBridges: [
+        /recharged (by|through|with) (people|friends|socializing)/i, /felt better after (talking|socializing|being with)/i,
+        /people (energized|recharged|helped) me/i, /needed (company|connection|people) to (recover|feel better)/i,
+        /isolation (made it|felt) worse/i, /being alone (didn't help|felt wrong|made it worse)/i,
+        /social(izing)? (helped|recharged|energized)/i
       ]
     },
     recovery_through_connection: {
@@ -350,6 +418,12 @@
       queryBridges: [
         /lonely/i, /processing/i, /need to talk/i, /isolated/i,
         /stuck in (my|own) head/i, /no one to (talk|listen)/i, /want to (share|vent|discuss)/i
+      ],
+      contradictionBridges: [
+        /processed (it )?(alone|internally|in my head)/i, /didn't need to (talk|vent|share)/i,
+        /figured it out (alone|by myself|on my own)/i, /talking (didn't help|made it worse|was exhausting)/i,
+        /needed (quiet|silence|solitude) to (process|think|recover)/i, /felt better after (being alone|quiet time|solitude)/i,
+        /alone time (helped|was what I needed)/i
       ]
     },
     closure_seeking: {
@@ -370,6 +444,12 @@
       queryBridges: [
         /need to know/i, /uncertainty/i, /waiting/i, /when will/i,
         /what happens (next|if)/i, /can't (wait|stand) (not knowing|uncertainty)/i, /open (loop|ended|question)/i
+      ],
+      contradictionBridges: [
+        /comfortable (with|in) uncertainty/i, /okay (with|not knowing|waiting)/i,
+        /let it (sit|remain|stay) (open|unresolved)/i, /didn't need (closure|resolution|answers) (right away|immediately)/i,
+        /patient (with|about) (uncertainty|not knowing|waiting)/i, /ambiguity (was fine|didn't bother|was okay)/i,
+        /open.?ended (was fine|felt okay|worked)/i, /embraced (uncertainty|ambiguity|not knowing)/i
       ]
     }
   };
@@ -405,6 +485,40 @@
   }
 
   /**
+   * Detect contradictions to behavioral patterns in a message
+   */
+  function detectContradictions(message) {
+    if (!message || typeof message !== 'string') return [];
+    const contradictions = [];
+
+    for (const [patternId, config] of Object.entries(BEHAVIORAL_VERB_PATTERNS)) {
+      if (!config.contradictionBridges || config.contradictionBridges.length === 0) continue;
+
+      let matchCount = 0;
+      for (const bridge of config.contradictionBridges) {
+        if (bridge.test(message)) matchCount++;
+      }
+
+      if (matchCount > 0) {
+        let strength = 'normal';
+        if (matchCount >= 3) strength = 'strong';
+        else if (matchCount === 1) strength = 'weak';
+        contradictions.push({ patternId, strength, matchCount });
+      }
+    }
+    return contradictions;
+  }
+
+  /**
+   * Determine evidence strength based on instance count
+   */
+  function determineStrength(instanceCount) {
+    if (instanceCount >= 3) return 'strong';
+    if (instanceCount >= 2) return 'normal';
+    return 'weak';
+  }
+
+  /**
    * Calculate recency in days for a memory
    */
   function calculateRecencyDays(memory) {
@@ -416,7 +530,7 @@
   }
 
   /**
-   * Calculate confidence score for a behavioral pattern
+   * Calculate confidence score for a behavioral pattern (legacy method)
    */
   function calculateConfidence(instances, queryRelevance) {
     if (!instances || instances.length === 0) return { level: 'LOW', score: 0 };
@@ -451,12 +565,257 @@
   }
 
   /**
-   * Main Scout analysis function
+   * Compute pattern confidence with time decay and contradiction handling
+   * @param {Array} evidence - All PatternEvidence records for this pattern
+   * @param {Date} now - Current time (defaults to new Date())
+   * @returns {Object} Confidence result with level, score, rationale, and debug info
+   */
+  function computePatternConfidence(evidence, now = new Date()) {
+    // Empty evidence = DORMANT
+    if (!evidence || evidence.length === 0) {
+      return {
+        confidence: 'DORMANT',
+        score: 0,
+        rationale: 'No evidence recorded for this pattern',
+        debug: {
+          last_observed: null,
+          supports_recent: 0,
+          supports_total: 0,
+          contradict_recent: 0,
+          contradict_total: 0,
+          decayed_from: null,
+          raw_score: 0
+        }
+      };
+    }
+
+    const nowMs = now.getTime();
+    const DAY_MS = 24 * 60 * 60 * 1000;
+    const config = CONFIDENCE_CONFIG;
+
+    // Separate evidence by polarity
+    const supports = evidence.filter(e => e.polarity === 'support');
+    const contradictions = evidence.filter(e => e.polarity === 'contradict');
+
+    // Categorize by recency
+    const categorizeByRecency = (items) => {
+      const recent = [];    // < 30 days
+      const stale = [];     // 30-90 days
+      const old = [];       // > 90 days
+
+      for (const item of items) {
+        const ageMs = nowMs - new Date(item.observed_at).getTime();
+        const ageDays = ageMs / DAY_MS;
+
+        if (ageDays < config.DECAY.RECENT_DAYS) {
+          recent.push({ ...item, ageDays });
+        } else if (ageDays < config.DECAY.STALE_DAYS) {
+          stale.push({ ...item, ageDays });
+        } else {
+          old.push({ ...item, ageDays });
+        }
+      }
+
+      return { recent, stale, old };
+    };
+
+    const supportCategories = categorizeByRecency(supports);
+    const contradictCategories = categorizeByRecency(contradictions);
+
+    // Calculate weighted support score
+    const weightedSupports =
+      supportCategories.recent.length * config.DECAY.RECENT_WEIGHT +
+      supportCategories.stale.length * config.DECAY.STALE_WEIGHT +
+      supportCategories.old.length * config.DECAY.OLD_WEIGHT;
+
+    // Base score from weighted instance count
+    let rawScore = 0;
+    const scoring = config.SCORING.INSTANCE_COUNT;
+    if (weightedSupports >= 4) rawScore += scoring[4];
+    else if (weightedSupports >= 3) rawScore += scoring[3];
+    else if (weightedSupports >= 2) rawScore += scoring[2];
+    else if (weightedSupports >= 1) rawScore += scoring[1];
+
+    // Cross-domain bonus (from all supports, not just recent)
+    const domains = new Set(supports.map(s => s.domain).filter(Boolean));
+    if (domains.size >= 3) {
+      rawScore += config.SCORING.CROSS_DOMAIN[3];
+    } else if (domains.size >= 2) {
+      rawScore += config.SCORING.CROSS_DOMAIN[2];
+    }
+
+    // Recency bonus (recent supports exist)
+    if (supportCategories.recent.length >= 2) {
+      rawScore += config.SCORING.RECENCY_BONUS;
+    } else if (supportCategories.recent.length >= 1) {
+      rawScore += config.SCORING.RECENCY_BONUS * 0.5;
+    }
+
+    // Find most recent evidence for debug
+    const lastObserved = evidence.reduce((latest, e) => {
+      const eDate = new Date(e.observed_at);
+      return !latest || eDate > latest ? eDate : latest;
+    }, null);
+
+    // Initialize debug info
+    const debug = {
+      last_observed: lastObserved ? lastObserved.toISOString() : null,
+      supports_recent: supportCategories.recent.length,
+      supports_total: supports.length,
+      contradict_recent: contradictCategories.recent.length,
+      contradict_total: contradictions.length,
+      decayed_from: null,
+      raw_score: Math.round(rawScore * 100) / 100
+    };
+
+    let score = rawScore;
+    const rationale = [];
+
+    // Apply contradiction penalties
+    for (const c of contradictions) {
+      const ageMs = nowMs - new Date(c.observed_at).getTime();
+      const ageDays = ageMs / DAY_MS;
+
+      // Base multiplier from strength
+      let multiplier = config.CONTRADICTION.STRENGTH_MULTIPLIER[c.strength] || config.CONTRADICTION.STRENGTH_MULTIPLIER.normal;
+
+      // Recent contradictions hit harder
+      if (ageDays < config.DECAY.RECENT_DAYS) {
+        multiplier *= 1.2;
+      } else if (ageDays < config.DECAY.STALE_DAYS) {
+        multiplier *= 0.8;
+      } else {
+        multiplier *= 0.5;
+      }
+
+      // Subtract weighted contradiction penalty
+      const penalty = config.CONTRADICTION.BASE_PENALTY * multiplier;
+      score -= penalty;
+    }
+
+    // Ensure score doesn't go negative
+    score = Math.max(0, score);
+
+    // Determine initial confidence level
+    let confidence;
+    const levels = config.LEVELS;
+
+    if (score >= levels.HIGH) {
+      confidence = 'HIGH';
+      rationale.push(`Strong evidence (${supports.length} supports, ${domains.size} domain${domains.size !== 1 ? 's' : ''})`);
+    } else if (score >= levels.MEDIUM) {
+      confidence = 'MEDIUM';
+      rationale.push(`Moderate evidence (${supports.length} supports)`);
+    } else if (score >= levels.LOW) {
+      confidence = 'LOW';
+      rationale.push(`Weak evidence (${supports.length} supports)`);
+    } else {
+      confidence = 'DORMANT';
+      rationale.push('Insufficient evidence');
+    }
+
+    // Rule: 120+ days since last support with no recent supports = max MEDIUM
+    const mostRecentSupport = supports.reduce((latest, s) => {
+      const sDate = new Date(s.observed_at);
+      return !latest || sDate > latest ? sDate : latest;
+    }, null);
+
+    if (mostRecentSupport) {
+      const daysSinceSupport = (nowMs - mostRecentSupport.getTime()) / DAY_MS;
+
+      if (daysSinceSupport >= config.DECAY.DORMANT_DAYS && supportCategories.recent.length === 0) {
+        if (confidence === 'HIGH') {
+          debug.decayed_from = 'HIGH';
+          confidence = 'MEDIUM';
+          rationale.push(`Decayed: ${Math.round(daysSinceSupport)} days since last support`);
+        }
+      }
+    }
+
+    // Rule: Recent strong contradiction = max MEDIUM unless 3+ recent strong supports override
+    const recentStrongContradictions = contradictCategories.recent.filter(c => c.strength === 'strong');
+    const recentStrongSupports = supportCategories.recent.filter(s => s.strength === 'strong');
+
+    if (recentStrongContradictions.length > 0) {
+      if (recentStrongSupports.length < config.CONTRADICTION.OVERRIDE_REQUIRES_SUPPORTS) {
+        if (confidence === 'HIGH') {
+          debug.decayed_from = debug.decayed_from || 'HIGH';
+          confidence = 'MEDIUM';
+          rationale.push(`Capped: ${recentStrongContradictions.length} recent strong contradiction${recentStrongContradictions.length !== 1 ? 's' : ''}`);
+        }
+      } else {
+        rationale.push(`Override: ${recentStrongSupports.length} recent strong supports counteract contradiction`);
+      }
+    }
+
+    // Add contradiction note to rationale if any exist
+    if (contradictions.length > 0 && !rationale.some(r => r.includes('contradiction'))) {
+      rationale.push(`${contradictions.length} contradiction${contradictions.length !== 1 ? 's' : ''} on record`);
+    }
+
+    return {
+      confidence,
+      score: Math.round(score * 100) / 100,
+      rationale: rationale.join('; '),
+      debug
+    };
+  }
+
+  /**
+   * Create a support evidence record
+   */
+  function createSupportEvidence(patternId, domain, strength, metadata = {}) {
+    return {
+      id: `${patternId}_support_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+      pattern_id: patternId,
+      domain: domain || null,
+      observed_at: new Date().toISOString(),
+      polarity: 'support',
+      strength: strength || 'normal',
+      ...metadata
+    };
+  }
+
+  /**
+   * Create a contradiction evidence record
+   */
+  function createContradictEvidence(patternId, domain, strength, metadata = {}) {
+    return {
+      id: `${patternId}_contradict_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+      pattern_id: patternId,
+      domain: domain || null,
+      observed_at: new Date().toISOString(),
+      polarity: 'contradict',
+      strength: strength || 'normal',
+      ...metadata
+    };
+  }
+
+  /**
+   * Send new evidence to content script for persistence
+   */
+  function sendNewEvidence(evidenceArray) {
+    if (!evidenceArray || evidenceArray.length === 0) return;
+
+    window.postMessage({
+      type: 'HEARTH_NEW_EVIDENCE',
+      evidence: evidenceArray
+    }, '*');
+
+    console.log('Hearth: Sent', evidenceArray.length, 'new evidence records to content script');
+  }
+
+  /**
+   * Main Scout analysis function with evidence-based confidence
    */
   function analyzeWithScout(memories, queryMessage) {
     if (!memories || memories.length === 0) return [];
 
     const patternMatches = {};
+    const newEvidence = [];
+
+    // Load existing pattern evidence from hearthData
+    const existingEvidence = hearthData?.patternEvidence || {};
 
     // Step 1: Detect patterns in all memories
     for (const memory of memories) {
@@ -486,12 +845,71 @@
       }
     }
 
-    // Step 2: Calculate confidence for each pattern
+    // Step 2: Create support evidence for detected patterns
+    for (const [patternId, data] of Object.entries(patternMatches)) {
+      // Determine primary domain (most common among instances)
+      const domainCounts = {};
+      for (const inst of data.instances) {
+        if (inst.domain) {
+          domainCounts[inst.domain] = (domainCounts[inst.domain] || 0) + 1;
+        }
+      }
+      const primaryDomain = Object.entries(domainCounts)
+        .sort((a, b) => b[1] - a[1])[0]?.[0] || null;
+
+      // Create support evidence
+      const strength = determineStrength(data.instances.length);
+      const evidence = createSupportEvidence(patternId, primaryDomain, strength, {
+        source_query: queryMessage?.substring(0, 100)
+      });
+      newEvidence.push(evidence);
+      console.log(`Hearth: Recording support evidence for ${patternId} (${strength})`);
+    }
+
+    // Step 3: Detect contradictions in user message
+    const contradictions = detectContradictions(queryMessage);
+    for (const contra of contradictions) {
+      const evidence = createContradictEvidence(contra.patternId, null, contra.strength, {
+        source_query: queryMessage?.substring(0, 100)
+      });
+      newEvidence.push(evidence);
+      console.log(`Hearth: Recording contradiction evidence for ${contra.patternId} (${contra.strength})`);
+    }
+
+    // Step 4: Calculate confidence for each pattern using evidence
     const scoredPatterns = [];
     for (const [patternId, data] of Object.entries(patternMatches)) {
       const queryRelevant = queryMatchesBridges(queryMessage, patternId);
-      const queryRelevance = queryRelevant ? 1.0 : 0.0;
-      const confidence = calculateConfidence(data.instances, queryRelevance);
+
+      // Combine existing evidence with new evidence for this pattern
+      const patternEvidence = [
+        ...(existingEvidence[patternId] || []),
+        ...newEvidence.filter(e => e.pattern_id === patternId)
+      ];
+
+      // Use evidence-based confidence if we have evidence, otherwise fall back to legacy
+      let confidenceResult;
+      if (patternEvidence.length > 0) {
+        confidenceResult = computePatternConfidence(patternEvidence);
+      } else {
+        // Legacy fallback
+        const queryRelevance = queryRelevant ? 1.0 : 0.0;
+        const legacyConfidence = calculateConfidence(data.instances, queryRelevance);
+        confidenceResult = {
+          confidence: legacyConfidence.level,
+          score: legacyConfidence.score,
+          rationale: `Legacy: ${data.instances.length} instances`,
+          debug: {
+            last_observed: null,
+            supports_recent: data.instances.length,
+            supports_total: data.instances.length,
+            contradict_recent: 0,
+            contradict_total: 0,
+            decayed_from: null,
+            raw_score: legacyConfidence.score
+          }
+        };
+      }
 
       scoredPatterns.push({
         patternId,
@@ -499,27 +917,40 @@
         application: data.application,
         domains: Array.from(data.domains),
         instanceCount: data.instances.length,
-        confidence,
+        confidence: {
+          level: confidenceResult.confidence,
+          score: confidenceResult.score
+        },
+        rationale: confidenceResult.rationale,
+        debug: confidenceResult.debug,
         queryRelevant
       });
     }
 
-    // Step 3: Filter to query-relevant patterns (or fall back to all)
-    let relevantPatterns = scoredPatterns.filter(p => p.queryRelevant);
-    if (relevantPatterns.length === 0) {
-      relevantPatterns = scoredPatterns;
+    // Step 5: Send new evidence to content script for persistence
+    if (newEvidence.length > 0) {
+      sendNewEvidence(newEvidence);
     }
 
-    // Step 4: Sort by confidence score
+    // Step 6: Filter out DORMANT patterns - they should not be surfaced
+    let activePatterns = scoredPatterns.filter(p => p.confidence.level !== 'DORMANT');
+
+    // Step 7: Filter to query-relevant patterns (or fall back to all active)
+    let relevantPatterns = activePatterns.filter(p => p.queryRelevant);
+    if (relevantPatterns.length === 0) {
+      relevantPatterns = activePatterns;
+    }
+
+    // Step 8: Sort by confidence score
     relevantPatterns.sort((a, b) => b.confidence.score - a.confidence.score);
 
-    // Step 5: Return top 3 meaningful patterns
+    // Step 9: Return top 3 meaningful patterns
     const topPatterns = relevantPatterns.slice(0, 3);
     return topPatterns.filter(p => p.confidence.level !== 'LOW' || p.instanceCount >= 2);
   }
 
   /**
-   * Build Scout analysis section for injection
+   * Build Scout analysis section for injection with debug fields
    */
   function buildScoutSection(analysis) {
     if (!analysis || analysis.length === 0) return '';
@@ -535,6 +966,34 @@
       lines.push(`  Observed across: ${domainsStr}`);
       lines.push(`  Evidence: ${pattern.instanceCount} instance${pattern.instanceCount !== 1 ? 's' : ''}`);
       lines.push(`  Intervention: ${pattern.application}`);
+
+      // Add debug fields when available
+      if (pattern.debug) {
+        // Last seen date
+        if (pattern.debug.last_observed) {
+          const lastDate = new Date(pattern.debug.last_observed);
+          lines.push(`  Last seen: ${lastDate.toISOString().split('T')[0]}`);
+        }
+
+        // Supports breakdown
+        lines.push(`  Supports: ${pattern.debug.supports_recent} recent / ${pattern.debug.supports_total} total`);
+
+        // Contradictions if any
+        if (pattern.debug.contradict_total > 0) {
+          lines.push(`  Contradictions: ${pattern.debug.contradict_recent} recent / ${pattern.debug.contradict_total} total`);
+        }
+
+        // Decay indicator
+        if (pattern.debug.decayed_from) {
+          lines.push(`  Decayed from: ${pattern.debug.decayed_from}`);
+        }
+      }
+
+      // Rationale
+      if (pattern.rationale) {
+        lines.push(`  Rationale: ${pattern.rationale}`);
+      }
+
       lines.push('');
     }
 

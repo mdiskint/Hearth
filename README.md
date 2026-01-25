@@ -35,8 +35,9 @@ Hearth is a Chrome extension that intercepts your messages to ChatGPT, Claude, a
 
 **Scout Pattern Analysis**
 - Detects 8 behavioral verb patterns in your memories
-- Calculates confidence levels (HIGH/MEDIUM/LOW) based on instance count, cross-domain evidence, and recency
-- Surfaces intervention suggestions based on detected patterns
+- Evidence-based confidence calibration with time decay
+- Contradiction detection downgrades stale patterns
+- DORMANT patterns (insufficient evidence) are not surfaced
 - Query-relevance matching via pattern bridges
 
 ## Architecture
@@ -74,6 +75,47 @@ User Message → Heat Detection → Temporal Filter → Semantic Retrieval → S
 | WARM | 0.3-0.6 | 90 days | should I, career change, relationship, struggling |
 | COOL | 0.1-0.3 | 30 days | how do I, explain, help me understand |
 | COLD | 0.0-0.1 | None (skip) | hi, thanks, ok, testing |
+
+### Confidence Calibration
+
+Confidence is a revocable license. Patterns must be re-validated by recent evidence to maintain high confidence, and counter-evidence actively downgrades confidence.
+
+**Recency Decay:**
+| Age | Weight | Effect |
+|-----|--------|--------|
+| <30 days | 1.0x | Full credit |
+| 30-90 days | 0.5x | Half credit |
+| >90 days | 0.25x | Quarter credit |
+
+**Contradiction Handling:**
+- Contradictions detected via pattern-specific bridges (e.g., "decided quickly" contradicts `decision_spiral`)
+- Contradiction strength: weak (1.5x penalty), normal (1.75x), strong (2.0x)
+- Recent strong contradictions cap confidence at MEDIUM
+- 3+ recent strong supports can override the cap
+
+**Confidence Levels:**
+| Level | Score Threshold | Behavior |
+|-------|-----------------|----------|
+| HIGH | ≥0.70 | Pattern applied directly |
+| MEDIUM | ≥0.40 | Pattern offered as option |
+| LOW | ≥0.20 | Pattern noted speculatively |
+| DORMANT | <0.10 | Pattern not surfaced |
+
+**Key Rules:**
+- 120+ days without recent support: max MEDIUM (decayed)
+- Recent strong contradiction: max MEDIUM (unless overridden)
+- DORMANT patterns are never injected into context
+
+**Scout Output Example:**
+```
+[HIGH] spirals via option-accumulation
+  Observed across: Work, Decisions
+  Evidence: 4 instances
+  Intervention: needs constraint to decide
+  Last seen: 2025-01-20
+  Supports: 3 recent / 4 total
+  Rationale: Strong evidence (4 supports, 2 domains)
+```
 
 ## Installation
 
@@ -186,10 +228,14 @@ hearth/
 │   ├── chatParser.js         # Conversation export parsing
 │   ├── supabaseSync.js       # Optional cloud sync
 │   └── scout/
-│       ├── behavioralVerbs.js   # 8 pattern definitions
-│       ├── confidenceScorer.js  # Confidence calculation
+│       ├── behavioralVerbs.js   # 8 pattern definitions + contradiction bridges
+│       ├── confidenceConfig.js  # Decay/contradiction thresholds
+│       ├── confidenceScorer.js  # Evidence-based confidence calculation
+│       ├── evidenceStore.js     # PatternEvidence persistence
 │       ├── scoutAnalyzer.js     # Main Scout logic
 │       └── index.js             # Module exports
+├── tests/
+│   └── scout-confidence.test.js # Confidence calibration tests
 └── storage/
     └── storage.js            # Chrome storage wrapper
 ```
