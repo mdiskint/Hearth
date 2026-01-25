@@ -1,330 +1,340 @@
-# 🔥 HEARTH - BUILD SUMMARY
+# HEARTH - BUILD SUMMARY
 
-## What We Just Built
+## What We Built
 
-**Hearth Phase 1** - A complete Chrome extension for personalized AI context injection
+**Hearth** - A Chrome extension for personalized AI context injection with behavioral pattern detection
 
-### ✅ Completed Features
+### Completed Features
 
-1. **15-Question Personality Quiz**
-   - Fun, engaging UI (not therapy intake)
-   - Mix of single-choice and multi-select questions
-   - Progress tracking and navigation
-   - Emoji-enhanced answer options
-   - 3 sections: Identity, Communication, Execution
+**1. Personality Quiz & OpSpec Generation**
+- 15-question personality quiz
+- Mix of single-choice and multi-select questions
+- Progress tracking and navigation
+- Generates structured Operating Specification
+- Personality archetype detection
 
-2. **OpSpec Generation Engine**
-   - Converts quiz answers → prose OpSpec
-   - Handles combination logic (e.g., "direct AND warm")
-   - Generates personality archetype
-   - Creates highlight summaries
-   - Full structured OpSpec output
+**2. Memory System**
+- Import conversations from Claude exports
+- Claude API-based memory extraction
+- Manual memory creation/editing/deletion
+- 6 memory types: fact, value, reward, synthesis, partner_model, self_model
+- 7 life domains: Work, Relationships, Creative, Self, Decisions, Resources, Values
+- 10 emotional states: Joy, Curiosity, Pride, Peace, Grief, Fear, Anxiety, Shame, Anger, Care
+- Heat scoring (0.0-1.0) for importance
 
-3. **Context Injection System**
-   - Platform detection (ChatGPT, Claude, Gemini)
-   - Automatic OpSpec prepending
-   - Works on Enter key or button click
-   - Respects enable/disable toggle
-   - Visual "Hearth Active" indicator
+**3. Intelligent Retrieval Pipeline**
+- Heat detection classifies query intensity (HOT/WARM/COOL/COLD)
+- Temporal filtering based on heat level
+- Semantic retrieval via OpenAI embeddings (text-embedding-3-small)
+- Cosine similarity with 0.55 threshold
+- Top 15 most relevant memories per query
 
-4. **Storage & Settings**
-   - LocalStorage wrapper
-   - Quiz answers persistence
-   - OpSpec storage
-   - Enable/disable injection
-   - Show/hide injected context (debug mode)
+**4. Scout Pattern Analysis**
+- 8 behavioral verb patterns detected
+- Confidence scoring (HIGH/MEDIUM/LOW)
+- Cross-domain evidence tracking
+- Recency weighting
+- Query-relevance matching via pattern bridges
+- Intervention suggestions
 
-5. **User Interface**
-   - Welcome screen
-   - Quiz flow (15 questions)
-   - Result screen with archetype
-   - Dashboard for post-quiz management
-   - Clean, modern design (purple gradient theme)
+**5. Context Injection**
+- Platform detection (ChatGPT, Claude, Gemini)
+- Fetch interception for seamless injection
+- OpSpec + memories + Scout analysis prepended
+- Enable/disable toggle
+- Debug mode to show injected context
+
+**6. Storage & Sync**
+- Chrome local storage
+- Optional Supabase cloud sync
+- Memory deduplication on import
+- Embedding generation and storage
 
 ---
 
-## 📁 File Structure (What Each File Does)
+## File Structure
 
 ### Core Files
-- **manifest.json** - Chrome extension configuration
-- **background.js** - Background service worker, initializes storage
-- **README.md** - Complete documentation
-- **QUICKSTART.md** - 5-minute setup guide
+```
+hearth/
+├── manifest.json              # Chrome extension configuration (MV3)
+├── background.js              # Service worker, initialization
+├── README.md                  # Complete documentation
+├── BUILD_SUMMARY.md           # This file
+```
 
-### Popup (Quiz Interface)
-- **popup/popup.html** - UI structure for all screens
-- **popup/popup.css** - Styling (gradient theme, card layouts)
-- **popup/popup.js** - Quiz logic, navigation, result display
+### Popup (Dashboard Interface)
+```
+├── popup/
+│   ├── popup.html            # UI structure
+│   ├── popup.css             # Styling
+│   └── popup.js              # Quiz, memories, dashboard logic
+```
 
 ### Content Scripts (Injection)
-- **content/content.js** - Main entry, adds visual indicator
-- **content/injector.js** - OpSpec injection logic
+```
+├── content/
+│   ├── content.js            # Main entry point
+│   ├── injector.js           # Data injection to page context
+│   └── fetch-interceptor.js  # Fetch interception, heat detection, Scout
+├── content-script/
+│   └── conversationMonitor.js # Live extraction (disabled)
+```
 
 ### Utilities
-- **utils/platforms.js** - Detects ChatGPT/Claude/Gemini
-- **utils/quiz-questions.js** - All 15 questions with metadata
-- **utils/opspec-generator.js** - Answers → OpSpec conversion
+```
+├── utils/
+│   ├── platforms.js          # Platform detection
+│   ├── embeddings.js         # OpenAI embedding generation
+│   ├── memoryExtractor.js    # Claude-based memory extraction
+│   ├── chatParser.js         # Conversation export parsing
+│   ├── modelRouter.js        # Model routing utilities
+│   ├── supabaseSync.js       # Cloud sync
+│   └── scout/
+│       ├── behavioralVerbs.js   # 8 pattern definitions
+│       ├── confidenceScorer.js  # Confidence calculation
+│       ├── scoutAnalyzer.js     # Main Scout logic
+│       └── index.js             # Module exports
+```
 
 ### Storage
-- **storage/storage.js** - LocalStorage wrapper, CRUD operations
-
-### Icons
-- **icons/** - Placeholder (you'll need to add actual PNG files)
+```
+└── storage/
+    └── storage.js            # Chrome storage wrapper
+```
 
 ---
 
-## 🎯 How It Works (The Flow)
+## Architecture
 
-### First-Time User Experience
+### The Pipeline
 
-1. **User installs extension**
-   - Background script initializes storage
-   - Default OpSpec is created (generic fallback)
+```
+User Message → Heat Detection → Temporal Filter → Semantic Retrieval → Scout Analysis → Build Context → Inject
+```
 
-2. **User clicks Hearth icon**
-   - Sees welcome screen
-   - Clicks "Let's go"
+### The Three-Layer System
 
-3. **Quiz flow**
-   - 15 questions, one at a time
-   - Progress bar updates
-   - Can go back/forward
-   - Answers saved to `quizAnswers` in storage
+**The Hearth** - Generates the baseline by retrieving memories using semantic similarity and heat-gating. This is the reference point.
 
-4. **Quiz completion**
-   - OpSpec generator processes answers
-   - Builds personality profile
-   - Generates prose OpSpec
-   - Shows result screen with archetype
+**The Scout** - Analyzes retrieved memories for behavioral invariants. Detects patterns in *how* you do things, not *what* you've done. Surfaces confidence levels.
 
-5. **Activation**
-   - User clicks "Let's go!"
-   - OpSpec saved to storage
-   - Dashboard appears
-   - Hearth is now active
+**The Judge** - The AI receiving context. Applies behavioral patterns to generate responses calibrated to your cognitive operating system.
+
+### Heat Classification
+
+| Level | Score | Time Window | Behavior |
+|-------|-------|-------------|----------|
+| HOT | 0.6-1.0 | All time | Crisis, deep struggles - full memory access |
+| WARM | 0.3-0.6 | 90 days | Decisions, changes - medium-term memories |
+| COOL | 0.1-0.3 | 30 days | How-to, factual - recent memories only |
+| COLD | 0.0-0.1 | None | Greetings, simple - skip memories entirely |
+
+### Behavioral Patterns Detected
+
+| Pattern | Verb | Intervention |
+|---------|------|--------------|
+| `decision_spiral` | spirals via option-accumulation | needs constraint to decide |
+| `momentum_through_building` | builds momentum through making | action over planning |
+| `externalization_for_clarity` | externalizes to clarify | make abstract concrete |
+| `constraint_as_liberation` | gains momentum through constraint | add artificial limits |
+| `avoidance_through_research` | delays through endless preparation | act with incomplete info |
+| `recovery_through_isolation` | recovers through isolation | protect recovery time |
+| `recovery_through_connection` | recovers through connection | facilitate talking |
+| `closure_seeking` | seeks rapid closure | provide clear next steps |
+
+### Confidence Scoring
+
+Score components:
+- **Instance count** (0.05-0.35): More memories matching = higher confidence
+- **Cross-domain bonus** (0-0.25): Same pattern across different life areas
+- **Recency** (0-0.15): Recent instances boost confidence
+- **Query relevance** (0-0.25): Pattern matches current query bridges
+
+Levels:
+- **HIGH** (≥0.70): Apply pattern directly
+- **MEDIUM** (0.40-0.69): Offer as option
+- **LOW** (<0.40): Surface as speculation
+
+---
+
+## How It Works
+
+### First-Time Setup
+
+1. User installs extension
+2. Takes 15-question personality quiz
+3. OpSpec generated from answers
+4. Dashboard appears with memory management
+
+### Memory Import
+
+1. User exports conversations from Claude
+2. Clicks "Import Memories" in dashboard
+3. Enters Anthropic API key (first time only)
+4. Claude extracts memories from conversations
+5. Embeddings generated via OpenAI
+6. Memories saved to local storage
 
 ### Ongoing Usage
 
-1. **User goes to ChatGPT/Claude/Gemini**
-   - Content script loads
-   - Platform detected
-   - OpSpec loaded from storage
-   - Visual indicator appears
+1. User goes to ChatGPT/Claude/Gemini
+2. Types a message
+3. Hearth detects query heat level
+4. Retrieves semantically relevant memories
+5. Scout analyzes for behavioral patterns
+6. Context injected into request
+7. AI responds with personalized context
 
-2. **User types a message**
-   - Injector watches for send
-   - OpSpec prepended to message
-   - Message sent with full context
+### Console Output
 
-3. **AI responds**
-   - Sees the OpSpec
-   - Adjusts behavior accordingly
-   - User gets personalized responses
+```
+Hearth: Query heat detected: 0.45 (WARM)
+Hearth: Heat WARM (0.45) - temporal gate passed 12/47 memories (last 90 days)
+Hearth: 8 memories above 0.55 threshold, top similarity: 0.823
+Hearth: Semantic retrieval found 8 relevant memories
+Hearth: Scout analysis found 2 patterns: HIGH spirals via option-accumulation, MEDIUM externalizes to clarify
+Hearth: Selected 8 memories for injection
+Hearth: Injected into Claude request
+```
 
 ---
 
-## 🧪 Testing Instructions
+## Testing
 
-### 1. Load the Extension
-
+### Load Extension
 ```
 chrome://extensions/ → Developer mode → Load unpacked → Select hearth folder
 ```
 
-### 2. Take the Quiz
-
+### Test Quiz
 - Click Hearth icon
-- Complete all 15 questions
-- Check that result screen shows correctly
-- Verify OpSpec makes sense
+- Complete 15 questions
+- Verify OpSpec generation
 
-### 3. Test Injection
+### Test Memory Import
+- Export conversations from Claude
+- Click "Import Memories"
+- Enter API key when prompted
+- Verify memories appear in dashboard
 
-- Go to claude.ai
-- Open DevTools → Console
-- Type a message
-- Look for "Hearth: OpSpec injected"
-- Verify message includes [HEARTH CONTEXT]
+### Test Injection
+1. Go to claude.ai
+2. Open DevTools → Console
+3. Send: "I'm stuck on which job to take"
+4. Look for Hearth logs
+5. Verify `[HEARTH CONTEXT]` includes `SCOUT ANALYSIS` section
 
-### 4. Test Settings
-
-- Toggle "Enable context injection" off
-- Send a message (should NOT inject)
-- Toggle back on
-- Send a message (should inject)
-
----
-
-## 🐛 Known Issues & Workarounds
-
-### Missing Icons
-**Issue:** Extension shows default Chrome icon  
-**Fix:** Add actual PNG files to `icons/` folder (16x16, 48x48, 128x128)  
-**Workaround:** Skip for now, functionality works without icons
-
-### Platform Selectors May Break
-**Issue:** ChatGPT/Claude update their UI, selectors stop working  
-**Fix:** Update selectors in `utils/platforms.js`  
-**Debug:** Check console for "Could not find input area"
-
-### Injection Timing Edge Cases
-**Issue:** Occasionally misses the send event  
-**Workaround:** Refresh the page if injection seems stuck  
-**Fix:** Add mutation observer in Phase 2
+### Test Heat Gating
+- Send "hi" → Should see COLD, no memories
+- Send "how do I center a div" → Should see COOL, 30-day window
+- Send "I'm struggling with a career decision" → Should see WARM, 90-day window
+- Send "I'm in crisis and can't cope" → Should see HOT, all memories
 
 ---
 
-## 📊 What We Achieved
+## API Keys Required
 
-### Lines of Code Written
-- **~1,200 lines** of production JavaScript
-- **~300 lines** of CSS
-- **~200 lines** of HTML
-- **Fully functional** Chrome extension
+**Anthropic API Key**
+- Used for: Memory extraction during import
+- When prompted: First import only, then saved
+- Model: claude-opus-4-20250514
 
-### Features Implemented
-✅ Complete personality quiz system  
-✅ OpSpec generation from answers  
-✅ Multi-platform injection  
-✅ Storage and persistence  
-✅ Dashboard and settings  
-✅ Visual indicators  
-✅ Error handling  
-✅ Documentation
+**OpenAI API Key**
+- Used for: Embedding generation for semantic retrieval
+- Model: text-embedding-3-small
+- Fallback: Heat-based sorting if no key
 
 ---
 
-## 🚀 What's Next (Phase 2)
+## Known Issues
 
-### Memory System
-1. **Memory CRUD UI**
-   - Add/edit/delete memories
-   - List view with filtering
-   - Search functionality
+**Platform Selectors**
+- May break if ChatGPT/Claude/Gemini update UI
+- Check `utils/platforms.js` if injection stops
 
-2. **Memory Storage**
-   - Structured memory objects
-   - Type classification (fact/value/pattern)
-   - Dimensional organization (17 dimensions)
+**API Dependencies**
+- Import requires Anthropic API key
+- Semantic retrieval requires OpenAI API key
+- Both cost money per use
 
-3. **Memory Injection**
-   - Combine OpSpec + relevant memories
-   - Token budget management
-   - Format for readability
+**Memory Limits**
+- Individual memories capped at 500 characters
+- Top 15 memories injected per query
+- Scout returns max 3 patterns
 
-### Semantic Retrieval (Phase 3)
-1. **Embedding Generation**
-   - Use transformers.js or API
-   - Generate embeddings on save
-   - Store with memories
-
-2. **Similarity Search**
-   - Cosine similarity calculation
-   - Top-N retrieval
-   - Relevance scoring
-
-3. **Heat-Gating** (Phase 4)
-   - Calculate query heat
-   - Gate retrieval by intensity
-   - Match memory depth to stakes
+**Live Extraction**
+- Implemented but disabled
+- Set `CONFIG.enabled = true` in conversationMonitor.js to enable
 
 ---
 
-## 💡 Key Design Decisions
+## What's Next
 
-### Why This Architecture?
+**Validation & Trust Scoring**
+- Track which memories prove useful
+- Prioritize validated patterns
+- Decay unused memories
 
-**Personality quiz instead of manual OpSpec:**
-- Lowers barrier to entry
-- Fun, not intimidating
-- Generates better structure than freeform
+**Live Extraction**
+- Enable real-time memory extraction
+- Configure API key passing
+- Test conversation monitor
 
-**Multi-select questions:**
-- Captures nuance (people aren't binary)
-- Allows contextual preferences
-- Better prose generation
-
-**Visible injection toggle:**
-- Transparency for users
-- Easy debugging
-- Trust through auditability
-
-**Platform-agnostic injection:**
-- One extension, three platforms
-- Easier to maintain
-- Better user experience
-
-### What We Avoided
-
-**❌ No server/API required**
-- Everything local in browser
-- Privacy-first
-- No costs to run
-
-**❌ No complex build process**
-- Plain JavaScript (no React/Vue)
-- Direct Chrome extension
-- Easy to modify
-
-**❌ No user accounts**
-- No sign-up friction
-- Works immediately
-- Data stays with user
+**Cross-Platform Import**
+- ChatGPT export support
+- Gemini export support
+- Plain text parsing
 
 ---
 
-## 🎓 What You Learned
+## Design Decisions
 
-If you followed this build, you now understand:
+**Why fetch interception?**
+- Works regardless of UI changes
+- Intercepts at API level
+- More reliable than DOM manipulation
 
-1. **Chrome extension architecture**
-   - Manifest v3
-   - Content scripts vs background workers
-   - Storage API
-   - Message passing
+**Why inline Scout code?**
+- Runs in page context (IIFE)
+- Cannot import modules
+- Must be self-contained
 
-2. **Context injection patterns**
-   - DOM manipulation
-   - Event interception
-   - Platform detection
+**Why heat-gating?**
+- Prevents irrelevant memory injection
+- Matches intensity to stakes
+- Reduces token usage
 
-3. **Quiz-to-prose generation**
-   - Answer mapping
-   - Profile building
-   - Template synthesis
+**Why behavioral verbs?**
+- Patterns persist across contexts
+- "How" more stable than "what"
+- Enables cross-domain application
 
-4. **UI state management**
-   - Screen navigation
-   - Multi-select handling
-   - Progress tracking
-
----
-
-## 📦 Deliverables
-
-You now have a complete, working Chrome extension:
-
-✅ `/hearth/` - Full source code  
-✅ `README.md` - Complete documentation  
-✅ `QUICKSTART.md` - 5-minute setup guide  
-✅ `BUILD_SUMMARY.md` - This file  
-
-**Next step:** Load it in Chrome and test it!
+**Why confidence levels?**
+- Prevents false certainty
+- Calibrates suggestion strength
+- Maintains user agency
 
 ---
 
-## 🎉 What Makes This Cool
+## Stats
 
-**It actually works.** This isn't a prototype or proof-of-concept. This is a fully functional Chrome extension you can use today.
-
-**It's personalized.** Not generic "AI assistant" vibes. It learns *your* preferences and reshapes how AI talks to you.
-
-**It's auditable.** You can read the OpSpec. You can see what's being injected. You control everything.
-
-**It's extensible.** Phase 1 is solid. Phase 2 (memories) builds naturally on this foundation.
-
-**It's yours.** No vendor lock-in, no API calls, no tracking. Your data, your browser, your AI.
+- **~2,500 lines** of JavaScript
+- **~400 lines** of CSS
+- **~250 lines** of HTML
+- **8** behavioral patterns
+- **4** heat levels
+- **6** memory types
+- **7** life domains
+- **10** emotional states
+- **3** platforms supported
 
 ---
 
-**Ready to test? See QUICKSTART.md and let's get Hearth running! 🔥**
+## The Core Thesis
+
+You can't align AI to an "average human" because no individual represents that statistical mean. Personalization isn't a feature layer - it's the fundamental unit of alignment.
+
+Hearth organizes around *how* you operate, not *what* you talk about. The Scout sees behavioral invariants across contexts. The Judge applies proven patterns to new situations.
+
+**This is what happens when you take personalization seriously.**
