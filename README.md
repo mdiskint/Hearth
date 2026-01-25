@@ -1,4 +1,4 @@
-# 🔥 Hearth - AI Personalization Through Behavioral Patterns
+# Hearth - AI Personalization Through Behavioral Patterns
 
 **Personalization IS Alignment**
 
@@ -6,27 +6,74 @@ Most AI systems try to align to an "average human" - a statistical fiction that 
 
 ## What It Does
 
-Hearth is a Chrome extension that learns how you think by watching you work, then makes ChatGPT, Claude, and Gemini adapt to your cognitive operating system:
+Hearth is a Chrome extension that intercepts your messages to ChatGPT, Claude, and Gemini, then prepends personalized context based on your cognitive profile and behavioral patterns:
 
 - **Operating Specification**: 15-question quiz generates your initial cognitive profile
-- **Automatic Memory Extraction**: Learns from your conversations in real-time as you use AI
-- **Import Past Conversations**: Bring your history from Claude, ChatGPT, or other platforms
-- **Manual Memory Curation**: Add, edit, or refine specific facts, values, and patterns
-- **Context Injection**: Automatically prepends your OpSpec and relevant memories to every message
+- **Memory Extraction**: Import past conversations from Claude to extract facts, values, and patterns
+- **Semantic Retrieval**: Only injects memories relevant to your current query
+- **Heat-Gated Filtering**: Matches memory depth to conversation intensity
+- **Scout Analysis**: Detects behavioral verb patterns across your memories
 - **Multi-Platform**: Works across ChatGPT, Claude, and Gemini
 - **Privacy-First**: Everything stored locally in your browser
 
 ## Current Features
 
-✅ Personality quiz that generates your Operating Specification  
-✅ **Automatic memory extraction** - learns from your conversations as you chat  
-✅ **Import conversations** from Claude, ChatGPT, Gemini, or other AI platforms  
-✅ Manual memory creation, editing, and deletion  
-✅ Memory organization by type (fact/value/pattern)  
-✅ Tagging by life domain (Work, Creative, Self, etc.)  
-✅ Tagging by emotional state (Joy, Anxiety, Curiosity, etc.)  
-✅ Automatic context injection across platforms  
-✅ Dashboard with enable/disable toggle  
+**Core System**
+- Personality quiz generating your Operating Specification
+- Import conversations from Claude exports (Anthropic API required)
+- Manual memory creation, editing, and deletion
+- Memory organization by type (fact/value/reward/synthesis/partner_model/self_model)
+- Tagging by life domain (Work, Relationships, Creative, Self, Decisions, Resources, Values)
+- Tagging by emotional state (Joy, Curiosity, Pride, Peace, Grief, Fear, Anxiety, Shame, Anger, Care)
+
+**Intelligent Retrieval**
+- Heat detection classifies query intensity (HOT/WARM/COOL/COLD)
+- Temporal filtering based on heat level (hot queries access all memories, cold queries skip memories)
+- Semantic retrieval via OpenAI embeddings (text-embedding-3-small)
+- Cosine similarity with 0.55 threshold filtering
+- Top 15 most relevant memories injected per query
+
+**Scout Pattern Analysis**
+- Detects 8 behavioral verb patterns in your memories
+- Calculates confidence levels (HIGH/MEDIUM/LOW) based on instance count, cross-domain evidence, and recency
+- Surfaces intervention suggestions based on detected patterns
+- Query-relevance matching via pattern bridges
+
+## Architecture
+
+```
+User Message → Heat Detection → Temporal Filter → Semantic Retrieval → Scout Analysis → Build Context → Inject
+```
+
+**The Three-Layer System:**
+
+**The Hearth** generates the baseline - retrieving memories using semantic similarity and heat-gating. This provides the reference point against which personalization is measured.
+
+**The Scout** analyzes retrieved memories for behavioral invariants - patterns in *how* you do things, not *what* you've done. When memories about apartment hunting and career decisions both appear, most systems see two topics. The Scout sees: "In both cases, you spiraled by collecting endless options. The noun changed, but the verb stayed the same."
+
+**The Judge** (the AI receiving context) applies these patterns to generate responses calibrated to your cognitive operating system. High confidence patterns get applied directly. Low confidence patterns get surfaced as options.
+
+### Behavioral Patterns Detected
+
+| Pattern | Verb | Intervention |
+|---------|------|--------------|
+| `decision_spiral` | spirals via option-accumulation | needs constraint to decide |
+| `momentum_through_building` | builds momentum through making | action over planning |
+| `externalization_for_clarity` | externalizes to clarify | make abstract concrete |
+| `constraint_as_liberation` | gains momentum through constraint | add artificial limits |
+| `avoidance_through_research` | delays through endless preparation | act with incomplete info |
+| `recovery_through_isolation` | recovers through isolation | protect recovery time |
+| `recovery_through_connection` | recovers through connection | facilitate talking |
+| `closure_seeking` | seeks rapid closure | provide clear next steps |
+
+### Heat Classification
+
+| Level | Score | Time Window | Example Triggers |
+|-------|-------|-------------|------------------|
+| HOT | 0.6-1.0 | All time | crisis, panic, overwhelming, hopeless |
+| WARM | 0.3-0.6 | 90 days | should I, career change, relationship, struggling |
+| COOL | 0.1-0.3 | 30 days | how do I, explain, help me understand |
+| COLD | 0.0-0.1 | None (skip) | hi, thanks, ok, testing |
 
 ## Installation
 
@@ -52,146 +99,109 @@ Hearth is a Chrome extension that learns how you think by watching you work, the
 4. Review your generated OpSpec
 5. Click "Let's go!" to activate
 
+### 4. API Keys
+
+**For memory extraction (import):**
+- Requires Anthropic API key
+- Prompted on first import, then saved locally
+
+**For semantic retrieval:**
+- Requires OpenAI API key (for embeddings)
+- Set via extension settings or storage
+
 ## How to Use
 
 ### Basic Usage
 
 1. Go to ChatGPT, Claude, or Gemini
-2. You'll see a small "🔥 Hearth Active" indicator
-3. Type your message as normal
-4. Hearth automatically:
-   - Extracts facts, values, and patterns from the conversation
-   - Prepends your OpSpec and relevant memories to your message
-   - Learns how you think and work over time
-5. The AI responds based on your personalized context
+2. Type your message as normal
+3. Hearth automatically:
+   - Detects query heat level
+   - Retrieves semantically relevant memories
+   - Runs Scout analysis for behavioral patterns
+   - Prepends your OpSpec, memories, and Scout insights
+4. The AI responds based on your personalized context
 
-**You don't need to do anything special.** Just use AI normally. Hearth watches your conversations and builds your memory bank automatically. The more you use it, the better it understands your cognitive patterns.
+Check the browser console for logs:
+- `Hearth: Query heat detected: 0.45 (WARM)`
+- `Hearth: Semantic retrieval found 8 relevant memories`
+- `Hearth: Scout analysis found 2 patterns: HIGH spirals via option-accumulation, MEDIUM externalizes to clarify`
 
-### How Memories Work
+### Importing Memories
 
-Hearth builds your memory bank through three channels:
+1. Export your conversations from Claude (Settings → Export Data)
+2. Click Hearth icon → Dashboard
+3. Click "Import Memories"
+4. Select your exported `.json` file
+5. Enter Anthropic API key when prompted (first time only)
+6. Memories are extracted and saved automatically
 
-**1. Automatic Extraction (Recommended)**
+### Manual Memory Curation
 
-As you use ChatGPT, Claude, or Gemini with Hearth enabled, the system automatically extracts:
-- Facts about you and your context
-- Values and preferences you express
-- Behavioral patterns in how you work and think
-
-This happens in the background. Just use AI normally and Hearth learns from your interactions.
-
-**2. Import Conversations**
-
-Already have conversation history with Claude, ChatGPT, or other AI platforms?
-1. Click Hearth icon → Dashboard
-2. Click "Import Conversations"
-3. Upload your chat history (supports Claude exports, ChatGPT JSON, plain text)
-4. Hearth extracts memories from past conversations
-
-**3. Manual Curation**
-
-Want to add something specific or refine what Hearth extracted?
 1. Click Hearth icon → Dashboard
 2. Click "Add Memory"
 3. Choose memory type:
    - **Fact**: Concrete information ("I'm a law student")
    - **Value**: What matters to you ("I prefer direct feedback")
-   - **Pattern**: How you think/behave ("When stuck, I build rather than plan")
-4. Tag with life domain and emotional state (optional)
-5. Save
-
-You can edit or delete any memory (automatic or manual) from the dashboard.
+   - **Reward**: Feedback on past interactions
+   - **Synthesis**: Patterns/insights about yourself
+   - **Partner Model**: How you want AI to behave
+   - **Self Model**: How you see yourself
+4. Set heat level (0.0-1.0) for importance
+5. Tag with life domain and emotional state (optional)
+6. Save
 
 ### Managing Your OpSpec
 
 **View/Edit:**
 - Click Hearth icon → Dashboard
-- See your OpSpec summary
 - Click "View/Edit OpSpec" for full version
 
 **Retake Quiz:**
 - Dashboard → "Retake personality quiz"
-- New answers generate fresh OpSpec
 
 **Disable/Enable:**
 - Toggle "Enable context injection" in Dashboard
-
-## How It Works
-
-Hearth's architecture is built on a simple insight: most AI memory systems organize around *what* you talked about (topics, entities, preferences). Hearth organizes around *how* you operate.
-
-**Memory Extraction**
-
-As you interact with Claude, ChatGPT, or Gemini, Hearth continuously extracts:
-- **Facts**: Concrete details about your context and situation
-- **Values**: What you care about, what matters in decisions
-- **Patterns**: How you approach problems, build momentum, or recover from stuckness
-
-You can also import past conversations or manually add memories, but the automatic extraction is what makes the system learn your actual cognitive patterns over time.
-
-**The Three-Layer System:**
-
-**The Hearth** retrieves your memories using semantic similarity and generates a baseline response - the kind of answer that would work for most people. This is the reference point.
-
-**The Scout** analyzes retrieved memories for behavioral invariants - patterns in how you process uncertainty, build momentum, recover from stuckness, or make decisions. When memories about apartment hunting and career decisions both appear, most systems see two separate topics. The Scout sees: "In both cases, you spiraled by collecting endless options without narrowing. The noun changed, but the verb stayed the same."
-
-**The Judge** applies these behavioral patterns to new contexts. If you broke through stuckness on one project by externalizing abstraction into spatial form, the Judge might suggest: "This feels stuck - what if you made it spatial instead of staying in writing mode?"
-
-The Scout's pattern recognition is probabilistic - it surfaces confidence levels (high/medium/low) and adjusts suggestions accordingly. High confidence means proven leverage. Low confidence means speculative synthesis. Both have value.
-
-**Current Implementation:** The OpSpec, automatic memory extraction, and memory injection system are fully functional. The Scout architecture is the theoretical framework guiding development of semantic retrieval and behavioral pattern extraction (coming in future updates).
-
-## What's Next
-
-**Semantic Retrieval**
-- Generate embeddings for each memory
-- Only inject most relevant memories based on query
-- Reduce token bloat, improve signal
-
-**Heat-Gating**
-- Match memory depth to conversation intensity
-- High-stakes memories surface in high-stakes moments
-- Light memories stay light
-
-**Behavioral Pattern Extraction**
-- Automatic detection of action invariants
-- Cross-domain pattern application
-- Confidence-calibrated suggestions
-
-**Validation & Trust Scoring**
-- Track which memories prove useful
-- Prioritize validated patterns
-- Learn what works for you over time
 
 ## Project Structure
 
 ```
 hearth/
-├── manifest.json           # Extension config
-├── background.js           # Background service worker
+├── manifest.json              # Extension config
+├── background.js              # Background service worker
 ├── popup/
-│   ├── popup.html         # Dashboard UI
-│   ├── popup.css          # Styling
-│   └── popup.js           # Quiz & memory logic
+│   ├── popup.html            # Dashboard UI
+│   ├── popup.css             # Styling
+│   └── popup.js              # Quiz & memory logic
 ├── content/
-│   ├── content.js         # Main content script
-│   └── injector.js        # Context injection
+│   ├── content.js            # Main content script
+│   ├── injector.js           # Data injection to page context
+│   └── fetch-interceptor.js  # Fetch interception, heat detection, Scout
+├── content-script/
+│   └── conversationMonitor.js # Live extraction (disabled)
 ├── utils/
-│   ├── platforms.js       # Platform detection
-│   ├── quiz-questions.js  # 15 questions
-│   └── opspec-generator.js # OpSpec generation
+│   ├── platforms.js          # Platform detection
+│   ├── embeddings.js         # OpenAI embedding generation
+│   ├── memoryExtractor.js    # Claude-based memory extraction
+│   ├── chatParser.js         # Conversation export parsing
+│   ├── supabaseSync.js       # Optional cloud sync
+│   └── scout/
+│       ├── behavioralVerbs.js   # 8 pattern definitions
+│       ├── confidenceScorer.js  # Confidence calculation
+│       ├── scoutAnalyzer.js     # Main Scout logic
+│       └── index.js             # Module exports
 └── storage/
-    └── storage.js         # LocalStorage wrapper
+    └── storage.js            # Chrome storage wrapper
 ```
 
 ## Development
 
 ### Debugging
 
-**Content Script:**
+**Console Logs:**
 - Open DevTools on ChatGPT/Claude/Gemini
-- Check Console for `Hearth:` logs
-- Verify OpSpec injection
+- Filter by `Hearth:` to see all logs
+- Key logs: heat detection, memory retrieval, Scout analysis
 
 **Popup:**
 - Right-click Hearth icon → Inspect popup
@@ -199,15 +209,35 @@ hearth/
 
 **Background Script:**
 - Go to `chrome://extensions/`
-- Click "Inspect views: background page"
+- Click "Inspect views: service worker"
 
 ### Testing Injection
 
 1. Go to claude.ai
 2. Open DevTools (F12) → Console
-3. Type a message
-4. Look for `Hearth: OpSpec injected` in console
-5. Verify `[HEARTH CONTEXT]` prepends your message
+3. Send a message like "I'm stuck on which job to take"
+4. Look for:
+   - `Hearth: Query heat detected: X.XX (WARM)`
+   - `Hearth: Semantic retrieval found X relevant memories`
+   - `Hearth: Scout analysis found X patterns`
+5. Verify `[HEARTH CONTEXT]` block includes `SCOUT ANALYSIS` section
+
+## What's Next
+
+**Validation & Trust Scoring**
+- Track which memories prove useful over time
+- Prioritize validated patterns
+- Decay unused memories
+
+**Live Extraction**
+- Real-time memory extraction during conversations
+- Currently implemented but disabled
+- Requires conversation monitor activation
+
+**Cross-Platform Import**
+- ChatGPT export support
+- Gemini export support
+- Plain text conversation parsing
 
 ## Known Issues
 
@@ -215,14 +245,15 @@ hearth/
 - May break if ChatGPT/Claude/Gemini update their UI
 - Check `utils/platforms.js` if injection stops working
 
-**Memory Token Limit**
-- All memories currently inject (no smart filtering yet)
-- Keep under 20 memories until semantic retrieval ships
-- Individual memories capped at 500 characters
+**API Keys Required**
+- Anthropic key for memory extraction (import)
+- OpenAI key for semantic retrieval (embeddings)
+- Without OpenAI key, falls back to heat-based sorting
 
-**Injection Timing**
-- Injects on button click or Enter key
-- Refresh page if injection seems stuck
+**Memory Limits**
+- Individual memories capped at 500 characters
+- Top 15 memories injected per query
+- Scout returns top 3 patterns max
 
 ## License
 
