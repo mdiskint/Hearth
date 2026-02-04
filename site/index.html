@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>🔥 Hearth — AI that actually knows you</title>
+  <style>
+    :root {
+      --bg: #1a1a1a;
+      --text: #e8e6e3;
+      --text-muted: #a8a5a0;
+      --ember: #c4654a;
+      --ember-soft: #d4846d;
+      --warm-dark: #1a1614;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      min-height: 100vh;
+    }
+
+    body::before,
+    body::after {
+      content: '';
+      position: fixed;
+      top: 0;
+      bottom: 0;
+      width: 4px;
+      background: linear-gradient(180deg, #e8a832, #d4503a);
+      z-index: 100;
+    }
+
+    body::before {
+      left: 0;
+    }
+
+    body::after {
+      right: 0;
+    }
+
+    .container {
+      max-width: 720px;
+      margin: 0 auto;
+      padding: 0 24px;
+    }
+
+    /* Hero */
+    .hero {
+      padding: 120px 0 80px;
+      text-align: center;
+    }
+
+    .hero h1 {
+      font-size: 2.5rem;
+      font-weight: 600;
+      margin-bottom: 24px;
+      letter-spacing: -0.02em;
+    }
+
+    .hero h1 span {
+      background: linear-gradient(90deg, #e8a832, #d4503a);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .subtitle {
+      font-size: 1.25rem;
+      color: var(--text-muted);
+      margin-bottom: 48px;
+    }
+
+    .highlight {
+      background: linear-gradient(90deg, #e8a832, #d4503a);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .logo {
+      font-size: 3rem;
+      font-weight: 600;
+      margin-bottom: 32px;
+      letter-spacing: 0.02em;
+    }
+
+    .hearth-brand {
+      background: linear-gradient(90deg, #e8a832, #d4503a);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    /* CTA */
+    .cta-group {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .cta {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      background: linear-gradient(90deg, #e8a832, #d4503a);
+      color: white;
+      padding: 14px 28px;
+      border-radius: 8px;
+      text-decoration: none;
+      font-weight: 500;
+      transition: opacity 0.2s;
+    }
+
+    .cta:hover {
+      opacity: 0.9;
+    }
+
+    .cta svg {
+      width: 20px;
+      height: 20px;
+    }
+
+    .cta-note {
+      font-size: 0.875rem;
+      color: var(--text-muted);
+    }
+
+    /* Sections */
+    .section,
+    .insight,
+    .memory {
+      padding: 60px 0;
+      border-top: 1px solid rgba(255, 255, 255, 0.06);
+    }
+
+    .section h2 {
+      font-size: 1.5rem;
+      margin-bottom: 24px;
+      color: var(--text);
+    }
+
+    .section p {
+      color: var(--text-muted);
+      margin-bottom: 16px;
+    }
+
+    /* Features */
+    .features {
+      display: grid;
+      gap: 32px;
+      margin-top: 32px;
+    }
+
+    .feature h3 {
+      font-size: 1.1rem;
+      margin-bottom: 8px;
+      color: var(--text);
+    }
+
+    .feature p {
+      color: var(--text-muted);
+      margin-bottom: 0;
+    }
+
+    /* Steps */
+    .steps {
+      display: grid;
+      gap: 24px;
+      margin-top: 32px;
+    }
+
+    .step {
+      display: flex;
+      gap: 16px;
+    }
+
+    .step-content h3 {
+      font-size: 1rem;
+      margin-bottom: 4px;
+    }
+
+    .step-content p {
+      font-size: 0.9rem;
+      margin-bottom: 0;
+    }
+
+    /* Footer */
+    footer {
+      padding: 40px 0;
+      border-top: 1px solid rgba(255, 255, 255, 0.06);
+      text-align: center;
+    }
+
+    footer p {
+      color: var(--text-muted);
+      font-size: 0.875rem;
+    }
+
+    footer a {
+      background: linear-gradient(90deg, #e8a832, #d4503a);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      text-decoration: none;
+    }
+
+    footer a:hover {
+      opacity: 0.8;
+    }
+
+    @media (max-width: 600px) {
+      .hero h1 {
+        font-size: 1.75rem;
+      }
+
+      .hero {
+        padding: 80px 0 60px;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <main>
+    <section class="hero">
+      <div class="container">
+        <p class="logo">🔥 <span class="hearth-brand">Hearth</span></p>
+        <h1>AI that actually knows you</h1>
+        <p class="subtitle">AI memory that learns <span class="highlight">how you think</span>—not just facts about you.
+        </p>
+        <p class="cta-note"
+          style="margin-bottom: 32px; max-width: 500px; margin-left: auto; margin-right: auto; font-size: 1.125rem;">In
+          controlled experiments, <span class="highlight">Hearth reduced generic responses</span> by 71% while making AI
+          <span class="highlight">more creative</span>, not less.
+        </p>
+        <div class="cta-group">
+          <a href="hearth-extension.zip" class="cta" download>
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"
+              stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round"
+                d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+            </svg>
+            Add to Chrome — Free
+          </a>
+          <p class="cta-note">Beta · Load as unpacked extension in Chrome</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="insight">
+      <div class="container">
+        <h2>The FDA stopped asking "Is this drug safe?" decades ago.</h2>
+        <p>They learned to ask: Safe for who? At what dose? Under what conditions?</p>
+        <p>AI alignment hasn't caught up.</p>
+        <p>Current AI systems optimize for a statistical average user—a composite that represents no one. The result?
+          AI that's technically "aligned to humanity" but actually aligned to no human.</p>
+        <p>Generic responses. Hedging. The same cautious tone for a teenager and a trauma surgeon. Safety theater.</p>
+        <p><strong class="highlight">Hearth is precision alignment.</strong> Safety that actually fits you.</p>
+      </div>
+    </section>
+
+    <section class="memory">
+      <div class="container">
+        <h2>Other memory systems remember what you <em>did</em>—which tools you used, which workflows succeeded.</h2>
+        <p>Hearth remembers who you <em>are</em>—why you made those choices, what you're actually trying to become.</p>
+        <p><strong class="highlight">One makes AI competent. The other makes AI aligned.</strong></p>
+        <p><strong>Standard Memory:</strong> "User asked about Python" / "User got frustrated with long answers" /
+          "Facts that fill up context"</p>
+        <p><strong>Hearth:</strong> "This user thinks in systems—lead with architecture, not syntax" / "Compress. This
+          user optimizes for directness." / "Understanding that compounds over time"</p>
+        <p><em>The difference: one depletes. The other builds.</em></p>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="container">
+        <h2>What the research shows</h2>
+        <p>We ran over 3,000 API calls testing how memory architecture affects AI behavior. Here's what we found:</p>
+
+        <div class="features">
+          <div class="feature">
+            <h3>30× fewer generic responses</h3>
+            <p>Telling AI what not to do (constraints) creates sustained behavioral change. Telling it what to do
+              (prescriptions) fades within 7-8 turns.</p>
+          </div>
+          <div class="feature">
+            <h3>71% reduction in 'that response'</h3>
+            <p>You know the one. The hedge. The 'I understand this is a complex topic.' The response that sounds like it
+              was written for everyone and therefore for no one.</p>
+          </div>
+          <div class="feature">
+            <h3>2.45 bits more creative range</h3>
+            <p>Counterintuitive finding: giving AI a clear picture of who you are doesn't limit its creativity—it
+              unlocks it. Personhood is generative, not restrictive.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="container">
+        <h2>How it works</h2>
+        <div class="steps">
+          <div class="step">
+            <div class="step-content">
+              <h3>Install the extension</h3>
+              <p>Add Hearth to Chrome. Takes 30 seconds.</p>
+            </div>
+          </div>
+          <div class="step">
+            <div class="step-content">
+              <h3>Chat with your AI normally</h3>
+              <p>Hearth runs in the background, building your Operator Specification—a structured document
+                describing how you think, what you value, and how you want to be challenged.</p>
+            </div>
+          </div>
+          <div class="step">
+            <div class="step-content">
+              <h3>Watch it compound</h3>
+              <p>Your OpSpec is injected at inference time. No fine-tuning. No data leaving your machine. Just context
+                that shapes every token. The more you use it, the less generic AI becomes.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="container">
+        <h2>Who this is for</h2>
+        <p>• Power users tired of re-explaining themselves every conversation</p>
+        <p>• Researchers who want to see what personalized alignment actually looks like</p>
+        <p>• Builders exploring memory architectures for their own AI products</p>
+        <p>• Anyone who's thought 'why does AI feel like it's talking to someone else?'</p>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="container" style="opacity: 0.8;">
+        <p>Here's the uncomfortable truth the AI industry hasn't faced:</p>
+        <p>Alignment isn't a property of the model. It's a property of the relationship.</p>
+        <p>You can't bake 'safe for everyone' into weights and expect it to work. Different people need different
+          things. A model that refuses to discuss medication interactions is 'safe' for most users and dangerous for a
+          physician who needs that information.</p>
+        <p><strong>Personalization IS alignment.</strong> Not a feature. Not a nice-to-have. The actual solution to the
+          problem everyone's trying to solve with more RLHF.</p>
+        <p>Hearth is proof of concept.</p>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <div class="container">
+      <div style="margin-bottom: 24px;">
+        <a href="hearth-extension.zip" class="cta" download>Add to Chrome — Free</a>
+      </div>
+      <p>
+        <a href="https://github.com/mdiskint/hearth" target="_blank">GitHub</a> ·
+        <a href="https://twitter.com/mdiskint" target="_blank">Twitter</a> ·
+        <a href="mailto:mdiskint37@gmail.com">Email</a> ·
+        <a href="privacy.html">Privacy</a>
+      </p>
+    </div>
+  </footer>
+</body>
+
+</html>
