@@ -1,320 +1,377 @@
-// opspec-generator.js - Convert quiz answers to OpSpec prose
+// opspec-generator.js - Convert quiz answers to OpSpec prose using wall/garden architecture
 
 const OpSpecGenerator = {
-  
-  generate(answers) {
-    const profile = this.buildProfile(answers);
-    const opspec = this.buildOpSpec(profile);
-    return opspec;
+  // WALLS - Universal constraints that apply to every user
+  WALLS: {
+    primeDirective: 'You are a thinking partner, not an assistant. No performing helpfulness. No preemptive validation. No opening with agreement unless you actually agree. Say what you see. Follow what\'s alive.',
+
+    antiSycophancy: 'Never open with validation tokens. If you agree, show it by building on their idea. If you disagree, say so directly. Honesty is the relationship.',
+
+    honestyProtocol: 'When uncertain, say so. Distinguish between what you know, what you\'re inferring, and what you\'re guessing. Never perform confidence you don\'t have. Never hedge to avoid commitment either.',
+
+    balanceConstraint: 'Does this expand or collapse the space of who they can safely become? Growth expands. Drift collapses.',
+
+    emotionalCoregulation: 'Feelings are signal, not noise. Name what you see. Adjust pace and density accordingly.'
   },
-  
+
+  generate(answers) {
+    const garden = this.buildGarden(answers);
+    return this.composeOpSpec(garden);
+  },
+
+  // Build the GARDEN - personalized slots filled from quiz answers
+  buildGarden(answers) {
+    const garden = {
+      identityFrame: '',
+      riskFrame: '',
+      explanationStyle: '',
+      feedbackStyle: '',
+      formatPreference: '',
+      autonomyLevel: '',
+      tangentPolicy: '',
+      challengeStyle: '',
+      hedgingTolerance: '',
+      dealbreakers: []
+    };
+
+    // Identity frame
+    if (answers.identity) {
+      const map = {
+        'A': 'They are a technical expert who values precision and depth. Meet them at their level of expertise.',
+        'B': 'They are ambitious and learning as they go—a vibe coder. Support their momentum while filling gaps they might not see.',
+        'C': 'They are a creative experimenter who learns by building. Give them materials and space to construct understanding.',
+        'D': 'They are a strategic planner who thinks several steps ahead. Map out implications and downstream effects.'
+      };
+      garden.identityFrame = map[answers.identity] || '';
+    }
+
+    // Risk frame
+    if (answers.risk) {
+      const map = {
+        'A': 'They take big swings everywhere. Match their boldness—don\'t dampen momentum with excessive caution.',
+        'B': 'They take creative and professional risks but are conservative with money. Be bold on ideas, careful on resource commitments.',
+        'C': 'They are calculated and careful across the board. Validate reasoning before leaps. Surface risks early.',
+        'D': 'They are conservative at work but experimental personally. Calibrate risk tolerance to context.'
+      };
+      garden.riskFrame = map[answers.risk] || '';
+    }
+
+    // Explanation style (from learning preferences)
+    if (answers.learning && answers.learning.length > 0) {
+      const prefs = [];
+      if (answers.learning.includes('A')) prefs.push('ground abstractions in analogies and real-world examples');
+      if (answers.learning.includes('B')) prefs.push('present facts clearly and organized');
+      if (answers.learning.includes('C')) prefs.push('walk through step-by-step without skipping');
+      if (answers.learning.includes('D')) prefs.push('leave room for experimentation rather than over-explaining');
+      garden.explanationStyle = prefs.length > 0 ? `When explaining: ${prefs.join(', ')}.` : '';
+    }
+
+    // Feedback style
+    if (answers.feedback) {
+      const map = {
+        'A': 'They want feedback direct and blunt. Skip the sandwich—just say what\'s wrong.',
+        'B': 'They want feedback warm but honest. Acknowledge effort, then be clear about issues.',
+        'C': 'They want feedback gentle. Start with what\'s working before addressing gaps.',
+        'D': 'They want feedback socratic. Ask questions that help them see gaps themselves rather than pointing directly.'
+      };
+      garden.feedbackStyle = map[answers.feedback] || '';
+    }
+
+    // Format preference - resolve tensions between opposing preferences
+    // A = formatted, B = natural, C = concise, D = thorough
+    // Tension pairs: C+D (density), A+B (structure)
+    if (answers.format && answers.format.length > 0) {
+      const hasA = answers.format.includes('A'); // formatted
+      const hasB = answers.format.includes('B'); // natural
+      const hasC = answers.format.includes('C'); // concise
+      const hasD = answers.format.includes('D'); // thorough
+      const count = answers.format.length;
+
+      if (count >= 3) {
+        // Many selected - resolve primary tension pair first
+        if (hasC && hasD) {
+          // Density tension is primary
+          garden.formatPreference = 'Be thorough on substance, concise in delivery — cover every angle but don\'t use three sentences where one works.' + (hasA ? ' Use formatting when it helps clarity.' : '') + (hasB ? ' Keep the tone conversational.' : '');
+        } else if (hasA && hasB) {
+          // Structure tension is primary
+          garden.formatPreference = 'Write conversationally but use structure when complexity demands it. Default to prose, reach for formatting only when it genuinely helps.' + (hasC ? ' Keep it tight.' : '') + (hasD ? ' Don\'t leave gaps.' : '');
+        } else {
+          // No primary tension - combine compatible preferences
+          garden.formatPreference = 'Be thorough on substance, concise in delivery. Write conversationally but use structure when complexity demands it.';
+        }
+      } else if (hasC && hasD) {
+        // Concise + thorough tension
+        garden.formatPreference = 'Be thorough on substance, concise in delivery — cover every angle but don\'t use three sentences where one works.';
+      } else if (hasA && hasB) {
+        // Formatted + natural tension
+        garden.formatPreference = 'Write conversationally but use structure when complexity demands it. Default to prose, reach for formatting only when it genuinely helps.';
+      } else if (hasC && hasA) {
+        // Concise + formatted
+        garden.formatPreference = 'Use clean formatting — headers, bullets — but keep each element tight. No padding.';
+      } else if (hasB && hasC) {
+        // Natural + concise
+        garden.formatPreference = 'Write naturally like conversation, keep it concise — minimal words.';
+      } else if (hasB && hasD) {
+        // Natural + thorough
+        garden.formatPreference = 'Write naturally but don\'t leave gaps — cover all the angles in conversational prose.';
+      } else if (hasA && hasD) {
+        // Formatted + thorough
+        garden.formatPreference = 'Use clear formatting and be thorough — headers, bullets, cover all angles. Make structure visible.';
+      } else if (hasB) {
+        // Natural alone
+        garden.formatPreference = 'Write naturally like you\'re talking to them. No formatting unless they ask.';
+      } else if (hasC) {
+        // Concise alone
+        garden.formatPreference = 'Keep it tight. Minimal words. Say it once.';
+      } else if (hasD) {
+        // Thorough alone
+        garden.formatPreference = 'Be thorough — cover all angles, surface edge cases, don\'t leave gaps.';
+      } else if (hasA) {
+        // Formatted alone
+        garden.formatPreference = 'Use clear formatting — headers, bullets, sections. Make structure visible.';
+      }
+    }
+
+    // Autonomy level - compose coherent policy from multi-select
+    // C = high autonomy (just do it), D = safety modifier, A/B = lower autonomy
+    if (answers.autonomy && answers.autonomy.length > 0) {
+      const hasA = answers.autonomy.includes('A'); // options
+      const hasB = answers.autonomy.includes('B'); // recommend
+      const hasC = answers.autonomy.includes('C'); // just do it
+      const hasD = answers.autonomy.includes('D'); // ask when high stakes
+      const count = answers.autonomy.length;
+
+      if (count >= 3) {
+        // Selected many - comprehensive policy
+        garden.autonomyLevel = 'Default to executing confidently. On genuine tradeoffs, recommend with reasoning. Only ask when stakes are high and you\'re unsure. Never just list options without helping choose.';
+      } else if (hasC && hasD) {
+        // High autonomy + safety check
+        garden.autonomyLevel = 'Execute confidently without asking — but check in when stakes are high or you\'re genuinely unsure.';
+      } else if (hasC && hasB) {
+        // High autonomy + recommend on tradeoffs
+        garden.autonomyLevel = 'Default to executing. When there are real tradeoffs, recommend with reasoning rather than asking permission.';
+      } else if (hasA && hasB) {
+        // Options + recommend
+        garden.autonomyLevel = 'Present options with a clear recommendation. Help them choose rather than just listing.';
+      } else if (hasC) {
+        // Just high autonomy
+        garden.autonomyLevel = 'Execute confidently. Report what you did, not what you\'re about to do.';
+      } else if (hasA) {
+        // Just options
+        garden.autonomyLevel = 'Present options and let them decide. Don\'t choose for them.';
+      } else if (hasB) {
+        // Just recommend
+        garden.autonomyLevel = 'Make recommendations with clear reasoning. Help them understand the tradeoffs.';
+      } else if (hasD) {
+        // Just safety check
+        garden.autonomyLevel = 'Ask before acting when stakes are high or you\'re uncertain about the approach.';
+      }
+    }
+
+    // Tangent policy
+    if (answers.tangents && answers.tangents.length > 0) {
+      if (answers.tangents.includes('A')) {
+        garden.tangentPolicy = 'Tangents and rabbit holes are always welcome. Follow interesting threads.';
+      } else if (answers.tangents.includes('B')) {
+        garden.tangentPolicy = 'Tangents are welcome unless they say "stay focused." Read the context.';
+      } else if (answers.tangents.includes('C')) {
+        garden.tangentPolicy = 'Tangents welcome for creative work. On urgent tasks, stay focused unless explicitly invited to explore.';
+      } else if (answers.tangents.includes('D')) {
+        garden.tangentPolicy = 'Stay on topic. Tangents are usually distracting—save them for later.';
+      }
+    }
+
+    // Challenge style
+    if (answers.challenge) {
+      const map = {
+        'A': 'When their thinking has gaps, ask questions until they see it themselves. Don\'t point—guide.',
+        'B': 'When their thinking has gaps, acknowledge what\'s working first, then reveal the gap clearly.',
+        'C': 'When their thinking has gaps, point it out directly. They\'d rather know fast than discover slowly.',
+        'D': 'When their thinking has gaps, let them work through it. They\'ll ask if they need help.'
+      };
+      garden.challengeStyle = map[answers.challenge] || '';
+    }
+
+    // Hedging tolerance
+    if (answers.hedging) {
+      const map = {
+        'A': 'Hedging when appropriate is honest. Use "maybe" and "it depends" when genuinely uncertain.',
+        'B': 'Some hedging is fine, but don\'t overdo it. Take positions when you can.',
+        'C': 'Commit to answers. Hedging reads as evasion. Say what you think.',
+        'D': 'Confident and wrong beats tentative and right. Commit to a position.'
+      };
+      garden.hedgingTolerance = map[answers.hedging] || '';
+    }
+
+    // Dealbreakers
+    if (answers.dealbreakers && answers.dealbreakers.length > 0) {
+      const breaks = [];
+      if (answers.dealbreakers.includes('A')) breaks.push('acting confident while clearly guessing');
+      if (answers.dealbreakers.includes('B')) breaks.push('giving endless options without helping choose');
+      if (answers.dealbreakers.includes('C')) breaks.push('using overly formal or robotic language');
+      if (answers.dealbreakers.includes('D')) breaks.push('apologizing excessively');
+      if (answers.dealbreakers.includes('E')) breaks.push('using corporate speak and buzzwords');
+      if (answers.dealbreakers.includes('F')) breaks.push('avoiding direct answers');
+      garden.dealbreakers = breaks;
+    }
+
+    return garden;
+  },
+
+  // Compose the final OpSpec as clean prose
+  composeOpSpec(garden) {
+    const paragraphs = [];
+
+    // P1: Prime directive + identity
+    const p1 = [this.WALLS.primeDirective];
+    if (garden.identityFrame) p1.push(garden.identityFrame);
+    if (garden.riskFrame) p1.push(garden.riskFrame);
+    paragraphs.push(p1.join(' '));
+
+    // P2: Communication style
+    const p2 = [this.WALLS.antiSycophancy];
+    if (garden.feedbackStyle) p2.push(garden.feedbackStyle);
+    if (garden.challengeStyle) p2.push(garden.challengeStyle);
+    paragraphs.push(p2.join(' '));
+
+    // P3: How to explain
+    const p3 = [];
+    if (garden.explanationStyle) p3.push(garden.explanationStyle);
+    if (garden.formatPreference) p3.push(garden.formatPreference);
+    if (p3.length > 0) paragraphs.push(p3.join(' '));
+
+    // P4: Working together
+    const p4 = [];
+    if (garden.autonomyLevel) p4.push(garden.autonomyLevel);
+    if (garden.tangentPolicy) p4.push(garden.tangentPolicy);
+    if (p4.length > 0) paragraphs.push(p4.join(' '));
+
+    // P5: Honesty
+    const p5 = [this.WALLS.honestyProtocol];
+    if (garden.hedgingTolerance) p5.push(garden.hedgingTolerance);
+    paragraphs.push(p5.join(' '));
+
+    // P6: Dealbreakers (only if any)
+    if (garden.dealbreakers.length > 0) {
+      paragraphs.push('Never: ' + garden.dealbreakers.join('; ') + '.');
+    }
+
+    // P7: Closing
+    paragraphs.push(this.WALLS.emotionalCoregulation + ' ' + this.WALLS.balanceConstraint);
+
+    const fullText = paragraphs.join('\n\n');
+
+    // Also build structured version for backward compatibility
+    const constraints = [];
+    if (garden.dealbreakers.length > 0) {
+      garden.dealbreakers.forEach(d => constraints.push(`Never: ${d}`));
+    }
+
+    return {
+      identity: garden.identityFrame,
+      constraints: constraints,
+      communication: [garden.feedbackStyle, garden.formatPreference, garden.explanationStyle].filter(Boolean).join(' '),
+      execution: [garden.autonomyLevel, garden.tangentPolicy, garden.challengeStyle].filter(Boolean).join(' '),
+      balanceProtocol: this.WALLS.balanceConstraint,
+      cognitiveArchitecture: this.WALLS.primeDirective + ' ' + this.WALLS.antiSycophancy + ' ' + this.WALLS.honestyProtocol,
+      fullText: fullText
+    };
+  },
+
+  // Build profile for summary generation
   buildProfile(answers) {
     const profile = {
       identity: {},
       communication: {},
-      execution: {},
-      constraints: [],
-      patterns: {}
+      execution: {}
     };
-    
-    // Q1: Identity archetype
-    if (answers.q1) {
+
+    // Identity
+    if (answers.identity) {
       const map = {
-        'A': { type: 'technical_expert', desc: 'a technical expert in my field' },
-        'B': { type: 'vibe_coder', desc: 'ambitious and learning as I go—a vibe coder' },
-        'C': { type: 'creative_experimenter', desc: 'a creative experimenter who learns by building' },
-        'D': { type: 'strategic_planner', desc: 'a strategic planner who thinks several steps ahead' }
+        'A': 'technical_expert',
+        'B': 'vibe_coder',
+        'C': 'creative_experimenter',
+        'D': 'strategic_planner'
       };
-      profile.identity.archetype = map[answers.q1].desc;
+      profile.identity.archetype = map[answers.identity];
     }
-    
-    // Q2: Risk profile
-    if (answers.q2) {
-      const map = {
-        'A': 'I take big swings everywhere',
-        'B': 'I take creative and professional risks but I\'m conservative with money',
-        'C': 'I\'m calculated and careful across the board',
-        'D': 'I\'m conservative at work but wild in my personal life'
-      };
-      profile.identity.risk = map[answers.q2];
+
+    // Feedback directness
+    if (answers.feedback) {
+      const map = { 'A': 10, 'B': 7, 'C': 4, 'D': 5 };
+      profile.communication.directness = map[answers.feedback] || 5;
     }
-    
-    // Q3: Learning preferences (multi-select)
-    if (answers.q3 && answers.q3.length > 0) {
-      const prefs = [];
-      if (answers.q3.includes('A')) {
-        prefs.push('analogies and real-world examples');
-        profile.constraints.push('Never use pure abstraction without grounding');
-      }
-      if (answers.q3.includes('B')) prefs.push('facts organized clearly');
-      if (answers.q3.includes('C')) {
-        prefs.push('step-by-step walkthroughs');
-        profile.constraints.push('Never skip steps or assume prior knowledge');
-      }
-      if (answers.q3.includes('D')) {
-        prefs.push('space to experiment and figure things out');
-        profile.constraints.push('Never over-explain when I can learn by doing');
-      }
-      profile.communication.learning = prefs;
+
+    // Learning style
+    if (answers.learning && answers.learning.length > 0) {
+      profile.communication.learning = answers.learning;
     }
-    
-    // Q4: Feedback style (multi-select)
-    if (answers.q4 && answers.q4.length > 0) {
-      const styles = answers.q4;
-      
-      if (styles.includes('A')) {
-        profile.constraints.push('Never sugarcoat feedback - be direct and blunt');
-      }
-      if (styles.includes('C') && !styles.includes('A')) {
-        profile.constraints.push('Never lead with criticism - start with what\'s working');
-      }
-      if (styles.includes('A') && styles.includes('C')) {
-        profile.constraints.push('Acknowledge what\'s working first, then be direct about issues');
-      }
-      if (styles.includes('B')) {
-        profile.communication.feedbackStyle = 'warm but honest';
-      }
-      if (styles.includes('D')) {
-        profile.communication.feedbackStyle = 'socratic - help me see it myself';
+
+    // Autonomy
+    if (answers.autonomy && answers.autonomy.includes('C')) {
+      profile.execution.autonomy = 'high';
+    }
+
+    // Tangents
+    if (answers.tangents) {
+      if (answers.tangents.includes('A') || answers.tangents.includes('B')) {
+        profile.execution.tangents = 'welcome';
       }
     }
-    
-    // Q5: Formatting preferences (multi-select)
-    if (answers.q5 && answers.q5.length > 0) {
-      const formats = answers.q5;
-      
-      if (formats.includes('B') && !formats.includes('A')) {
-        profile.constraints.push('Never use excessive formatting (headers, bullets) unless explicitly requested');
-      }
-      if (formats.includes('D') && formats.includes('B')) {
-        profile.communication.style = 'Cover all angles in natural prose - comprehensive but conversational';
-      }
-      if (formats.includes('C') && formats.includes('D')) {
-        profile.communication.style = 'Comprehensive but tight - complete information, efficiently expressed';
-      }
-      if (formats.includes('C') && !formats.includes('D')) {
-        profile.constraints.push('Never ramble - keep it concise');
-      }
-      if (formats.includes('A')) {
-        profile.communication.formatting = 'structured with headers and bullets';
-      }
-    }
-    
-    // Q6: Communication style (max 2)
-    if (answers.q6 && answers.q6.length > 0) {
-      const styles = answers.q6;
-      if (styles.includes('A')) {
-        profile.constraints.push('Never use corporate or robotic language');
-        profile.communication.tone = 'natural and conversational';
-      }
-      if (styles.includes('B')) {
-        profile.communication.tone = 'professional and structured';
-      }
-      if (styles.includes('C')) {
-        profile.communication.tone = 'warm and encouraging';
-      }
-      if (styles.includes('D')) {
-        profile.communication.tone = 'efficient and minimal';
-      }
-    }
-    
-    // Q7: Uncertainty handling
-    if (answers.q7) {
-      const map = {
-        'A': { constraint: 'Never express false confidence when uncertain - say so clearly', tone: 'honest about limits' },
-        'B': { constraint: 'Don\'t overdo hedging, but be honest when uncertain', tone: 'balanced confidence' },
-        'C': { tone: 'confident by default' },
-        'D': { tone: 'commit to answers even when guessing' }
-      };
-      if (map[answers.q7].constraint) {
-        profile.constraints.push(map[answers.q7].constraint);
-      }
-    }
-    
-    // Q8: Directness calibration
-    if (answers.q8) {
-      const map = {
-        'A': { directness: 3 },
-        'B': { directness: 7 },
-        'C': { directness: 10 },
-        'D': { directness: 1 }
-      };
-      profile.communication.directness = map[answers.q8].directness;
-    }
-    
-    // Q9: Problem-solving approach
-    if (answers.q9) {
-      const map = {
-        'A': 'Know when to suggest taking a break',
-        'B': 'Support experimentation and trying different approaches',
-        'C': 'Help me think through problems by externalizing',
-        'D': 'Support fresh starts when frustration is high'
-      };
-      profile.execution.problemSolving = map[answers.q9];
-    }
-    
-    // Q10: Decision-making (multi-select)
-    if (answers.q10 && answers.q10.length > 0) {
-      const prefs = answers.q10;
-      if (prefs.includes('A')) {
-        profile.constraints.push('Never decide for me without presenting options');
-        profile.execution.decisions = 'Give me options and let me decide';
-      }
-      if (prefs.includes('D') || prefs.includes('C')) {
-        profile.execution.autonomy = 'Execute confidently when you\'re sure';
-      }
-      if (prefs.includes('B')) {
-        profile.execution.guidance = 'Make recommendations and explain why';
-      }
-    }
-    
-    // Q11: When to ask (multi-select)
-    if (answers.q11 && answers.q11.length > 0) {
-      const conditions = [];
-      if (answers.q11.includes('A')) conditions.push('uncertain about the approach');
-      if (answers.q11.includes('B')) conditions.push('high-stakes or expensive');
-      if (answers.q11.includes('C')) conditions.push('first time seeing this type of task');
-      if (answers.q11.includes('D')) {
-        profile.execution.askWhen = 'Never - just do it and tell me after';
-      } else if (conditions.length > 0) {
-        profile.execution.askWhen = `Ask before acting when: ${conditions.join(', OR when ')}. Otherwise execute confidently.`;
-      }
-    }
-    
-    // Q12: Tangents (multi-select)
-    if (answers.q12 && answers.q12.length > 0) {
-      const prefs = answers.q12;
-      if (prefs.includes('A')) {
-        profile.execution.tangents = 'Embrace tangents and exploration - always welcome';
-      } else if (prefs.includes('B')) {
-        profile.execution.tangents = 'Tangents and rabbit holes are welcome unless I explicitly say "stay focused"';
-      } else if (prefs.includes('C')) {
-        profile.execution.tangents = 'Embrace tangents for creative work. Stay focused on urgent tasks unless explicitly invited to explore';
-      } else if (prefs.includes('D')) {
-        profile.execution.tangents = 'Stay on topic - tangents are usually distracting';
-      }
-    }
-    
-    // Q13: Rapid-fire patterns
-    if (answers.q13) {
-      profile.patterns.priorities = answers.q13;
-    }
-    
-    // Q14: Hedging tolerance
-    if (answers.q14) {
-      const map = {
-        'B': 'Don\'t hedge excessively',
-        'C': 'Never hedge - commit to an answer',
-        'D': 'Be confident even when uncertain'
-      };
-      if (map[answers.q14]) {
-        profile.constraints.push(map[answers.q14]);
-      }
-    }
-    
-    // Q15: Dealbreakers (multi-select)
-    if (answers.q15 && answers.q15.length > 0) {
-      const dealbreakers = answers.q15;
-      if (dealbreakers.includes('A')) profile.constraints.push('Never act confident while clearly guessing');
-      if (dealbreakers.includes('B')) profile.constraints.push('Never overwhelm with options without helping choose');
-      if (dealbreakers.includes('C')) profile.constraints.push('Never use overly formal or robotic language');
-      if (dealbreakers.includes('D')) profile.constraints.push('Never apologize excessively');
-      if (dealbreakers.includes('E')) profile.constraints.push('Never use corporate speak and buzzwords');
-      if (dealbreakers.includes('F')) profile.constraints.push('Never avoid giving direct answers');
-    }
-    
+
     return profile;
   },
-  
-  buildOpSpec(profile) {
-    // Build identity section
-    let identity = `I'm ${profile.identity.archetype}. ${profile.identity.risk}.`;
-    
-    if (profile.communication.learning && profile.communication.learning.length > 0) {
-      identity += ` I learn best through ${profile.communication.learning.join(', ')}.`;
-    }
-    
-    // Build constraints section
-    const constraints = profile.constraints.length > 0 
-      ? profile.constraints 
-      : ['Never make assumptions about what I want without asking'];
-    
-    // Build communication section
-    let communication = '';
-    if (profile.communication.tone) {
-      communication += `${profile.communication.tone.charAt(0).toUpperCase() + profile.communication.tone.slice(1)}. `;
-    }
-    if (profile.communication.style) {
-      communication += `${profile.communication.style}. `;
-    }
-    if (profile.communication.feedbackStyle) {
-      communication += `Feedback style: ${profile.communication.feedbackStyle}. `;
-    }
-    
-    // Build execution section
-    let execution = '';
-    if (profile.execution.decisions) {
-      execution += `${profile.execution.decisions}. `;
-    }
-    if (profile.execution.guidance) {
-      execution += `${profile.execution.guidance}. `;
-    }
-    if (profile.execution.askWhen) {
-      execution += `${profile.execution.askWhen}. `;
-    }
-    if (profile.execution.tangents) {
-      execution += `${profile.execution.tangents}. `;
-    }
-    if (profile.execution.problemSolving) {
-      execution += `${profile.execution.problemSolving}. `;
-    }
-    
-    // Return structured OpSpec
-    return {
-      identity: identity.trim(),
-      constraints: constraints,
-      communication: communication.trim() || 'Natural and conversational. Be honest when uncertain.',
-      execution: execution.trim() || 'Ask when confused, execute when confident.',
-      balanceCheck: 'Does this expand or collapse the space of who I can safely become? Growth expands. Drift collapses.'
-    };
-  },
-  
+
   // Generate human-readable summary for result screen
   generateSummary(opspec, profile) {
     let archetype = 'Human';
     if (profile.identity.archetype) {
-      if (profile.identity.archetype.includes('vibe coder')) archetype = 'The Ambitious Explorer';
-      else if (profile.identity.archetype.includes('technical expert')) archetype = 'The Technical Expert';
-      else if (profile.identity.archetype.includes('creative experimenter')) archetype = 'The Creative Builder';
-      else if (profile.identity.archetype.includes('strategic planner')) archetype = 'The Strategic Thinker';
+      const archetypeMap = {
+        'vibe_coder': 'The Ambitious Explorer',
+        'technical_expert': 'The Technical Expert',
+        'creative_experimenter': 'The Creative Builder',
+        'strategic_planner': 'The Strategic Thinker'
+      };
+      archetype = archetypeMap[profile.identity.archetype] || 'Human';
     }
-    
+
     const highlights = [];
-    
+
     // Directness
     if (profile.communication.directness >= 8) {
       highlights.push({ icon: '🎯', text: 'Direct & honest - No sugarcoating' });
-    } else if (profile.communication.directness <= 3) {
-      highlights.push({ icon: '🤝', text: 'Warm & supportive - Gentle guidance' });
+    } else if (profile.communication.directness <= 4) {
+      highlights.push({ icon: '🌱', text: 'Gentle guidance - Build on what works' });
     } else {
       highlights.push({ icon: '⚖️', text: 'Balanced - Warm but honest' });
     }
-    
+
     // Learning style
-    if (profile.communication.learning && profile.communication.learning.includes('analogies')) {
-      highlights.push({ icon: '🧠', text: 'Analogies & walkthroughs - Step-by-step explanations' });
+    if (profile.communication.learning) {
+      if (profile.communication.learning.includes('A')) {
+        highlights.push({ icon: '🌉', text: 'Analogies & examples - Grounded explanations' });
+      }
+      if (profile.communication.learning.includes('C')) {
+        highlights.push({ icon: '👣', text: 'Step-by-step - Never skip ahead' });
+      }
     }
-    
-    // Execution
-    if (profile.execution.autonomy) {
-      highlights.push({ icon: '⚡', text: 'Confident execution - Act when sure, ask when not' });
+
+    // Autonomy
+    if (profile.execution.autonomy === 'high') {
+      highlights.push({ icon: '⚡', text: 'Confident execution - Act when sure' });
     }
-    
+
     // Tangents
-    if (profile.execution.tangents && profile.execution.tangents.includes('welcome')) {
-      highlights.push({ icon: '🌊', text: 'Embrace tangents - Exploration encouraged' });
+    if (profile.execution.tangents === 'welcome') {
+      highlights.push({ icon: '🐰', text: 'Tangents welcome - Follow the interesting threads' });
     }
-    
+
+    // Ensure at least one highlight
+    if (highlights.length === 0) {
+      highlights.push({ icon: '🤝', text: 'Thinking partner - Not an assistant' });
+    }
+
     return {
       archetype,
       highlights

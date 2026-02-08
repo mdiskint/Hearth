@@ -304,3 +304,26 @@ function testHeatDetector() {
     console.log('');
   }
 }
+
+// Export for browser context
+if (typeof window !== 'undefined') {
+  window.detectQueryHeat = detectQueryHeat;
+  window.getHeatLabel = getHeatLabel;
+  window.HearthHeatDetector = {
+    detectQueryHeat,
+    getHeatLabel,
+    HEAT_PATTERNS,
+    INTENSITY_BOOSTERS
+  };
+}
+
+// Export for module context
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = {
+    detectQueryHeat,
+    getHeatLabel,
+    HEAT_PATTERNS,
+    INTENSITY_BOOSTERS,
+    testHeatDetector
+  };
+}

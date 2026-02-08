@@ -15,8 +15,8 @@
     "https://chatgpt.com/*",
     "https://claude.ai/*",
     "https://gemini.google.com/*",
-    "https://wkfwtivvhwyjlkyrikeu.supabase.co/*",
-    "https://api.openai.com/*"
+    "https://api.openai.com/*",
+    "https://wkfwtivvhwyjlkyrikeu.supabase.co/*"
   ],
   
   "action": {
@@ -32,9 +32,17 @@
         "https://gemini.google.com/*"
       ],
       "js": [
+        "utils/heatDetector.js",
+        "utils/affectDetector.js",
+        "utils/forgeDetector.js",
+        "utils/durabilityClassifier.js",
+        "utils/scout/goalExtractor.js",
+        "utils/scout/memoryFilter.js",
+        "utils/scout/scoutAnalyzerV2.js",
+        "utils/memoryExtractor.js",
+        "utils/aiMemoryExtractor.js",
         "utils/platforms.js",
-        "utils/embeddings.js",
-        "utils/supabaseSync.js",
+        "storage/supabase.js",
         "storage/storage.js",
         "content/injector.js",
         "content/content.js"
@@ -50,11 +58,17 @@
   "web_accessible_resources": [{
     "resources": [
       "content/fetch-interceptor.js",
-      "content-script/conversationMonitor.js",
-      "utils/modelRouter.js",
-      "utils/scout/scoutAnalyzer.js",
-      "utils/scout/behavioralVerbs.js",
-      "utils/scout/confidenceScorer.js"
+      "utils/heatDetector.js",
+      "utils/affectDetector.js",
+      "utils/forgeDetector.js",
+      "utils/durabilityClassifier.js",
+      "utils/scout/goalExtractor.js",
+      "utils/scout/memoryFilter.js",
+      "utils/scout/scoutAnalyzerV2.js",
+      "utils/memoryExtractor.js",
+      "utils/aiMemoryExtractor.js",
+      "opspec-modules.js",
+      "src/retrieval/hearth-retrieval.js"
     ],
     "matches": [
       "https://chat.openai.com/*",

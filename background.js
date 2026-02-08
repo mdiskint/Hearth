@@ -9,7 +9,7 @@ console.log('Hearth: Background script loaded');
 // Initialize storage on install
 chrome.runtime.onInstalled.addListener(async () => {
   console.log('Hearth: Extension installed');
-  
+
   // Initialize default storage
   const data = await chrome.storage.local.get(null);
   if (!data.initialized) {
@@ -18,15 +18,66 @@ chrome.runtime.onInstalled.addListener(async () => {
       quizCompleted: false,
       quizAnswers: {},
       opspec: getDefaultOpSpec(),
-      memories: [],
+      liveExtractionEnabled: true,
+      /* GUTTED - MEMORY */
       settings: {
-        enabled: true,
-        injectionVisible: true
+        enabled: true
       }
     });
     console.log('Hearth: Storage initialized');
   }
 });
+
+// Listen for auth state changes (from popup)
+chrome.storage.onChanged.addListener((changes, namespace) => {
+  if (namespace === 'local') {
+    // User signed in
+    if (changes.supabaseUser && changes.supabaseUser.newValue) {
+      console.log('Hearth: User signed in, triggering sync');
+      triggerInitialSync();
+    }
+
+    // User signed out
+    if (changes.supabaseUser && !changes.supabaseUser.newValue && changes.supabaseUser.oldValue) {
+      console.log('Hearth: User signed out, stopping sync');
+      // Keep local data, just stop any ongoing sync
+    }
+  }
+});
+
+// Trigger initial sync when user signs in
+async function triggerInitialSync() {
+  try {
+    const data = await chrome.storage.local.get(['opspec', 'supabaseSession', 'supabaseUser']);
+
+    if (!data.supabaseSession || !data.supabaseUser) {
+      console.log('Hearth: No auth session, skipping sync');
+      return;
+    }
+
+    // TODO: Implement OpSpec sync to Supabase
+    // For now, just log that we would sync
+    console.log('Hearth: Would sync OpSpec for user', data.supabaseUser.email);
+
+    // Future: POST opspec to Supabase with user_id
+    // const response = await fetch(`${SUPABASE_URL}/rest/v1/user_opspecs`, {
+    //   method: 'POST',
+    //   headers: {
+    //     'apikey': SUPABASE_ANON_KEY,
+    //     'Authorization': `Bearer ${data.supabaseSession.access_token}`,
+    //     'Content-Type': 'application/json',
+    //     'Prefer': 'resolution=merge-duplicates'
+    //   },
+    //   body: JSON.stringify({
+    //     user_id: data.supabaseUser.id,
+    //     opspec: data.opspec,
+    //     updated_at: new Date().toISOString()
+    //   })
+    // });
+  } catch (error) {
+    console.error('Hearth: Sync error', error);
+  }
+}
 
 // Handle messages from content scripts
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
@@ -34,46 +85,12 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     chrome.action.openPopup();
   }
 
-  if (request.action === 'extractMemories') {
-    handleMemoryExtraction(request.messages, request.routing)
-      .then(memories => sendResponse({ success: true, memories }))
-      .catch(error => sendResponse({ success: false, error: error.message }));
-    return true; // Keep channel open for async response
-  }
+  /* GUTTED - MEMORY */
 
   // Sync handling moved to content script (injector.js)
 });
 
-async function handleMemoryExtraction(messages, routing) {
-  const { anthropicApiKey } = await chrome.storage.local.get('anthropicApiKey');
-
-  if (!anthropicApiKey) {
-    throw new Error('Anthropic API key not configured');
-  }
-
-  const extractionPrompt = `Extract memories from this conversation...`; // Will add full prompt
-
-  const response = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': anthropicApiKey,
-      'anthropic-version': '2023-06-01'
-    },
-    body: JSON.stringify({
-      model: routing.model,
-      max_tokens: 4096,
-      messages: [{ role: 'user', content: extractionPrompt }]
-    })
-  });
-
-  if (!response.ok) {
-    throw new Error(`API call failed: ${response.statusText}`);
-  }
-
-  const data = await response.json();
-  return JSON.parse(data.content[0].text);
-}
+/* GUTTED - MEMORY */
 
 function getDefaultOpSpec() {
   return {
@@ -137,7 +154,23 @@ The balance check: does this expand or collapse the space of who you can safely 
 Expansion means more options, more agency, more capability.
 Collapse means narrowing, dependency, or drift.
 
-Growth expands. Drift collapses.`
+Growth expands. Drift collapses.`,
+    opspecAppendix: `{
+  "userFacts": [
+    "Career/profession/work identity (inferred): You operate like a systems builder/operator configuring AI workflows—someone who designs \"how the system should work\" using schemas and constraints. Concrete signal: you requested a strict JSON configuration payload and treated the output as a control surface for AI behavior.",
+    "Cognitive infrastructure (inferred): You likely have a high need for precision, low tolerance for ambiguity, and a preference for declarative structure (schemas, exact formats). No direct evidence of ADHD/aphantasia/etc. Concrete signal: you repeatedly enforced \"exact format,\" \"be direct and specific,\" and pushed back hard on missing personal answers.",
+    "Major current project/goal (inferred): You are actively building a personal AI partner profile / operating manual to configure multiple AI systems to work with you consistently. Concrete signal: \"these answers will configure how AI systems work with me.\"",
+    "Current situational context (inferred): You’re working in a professional context tied to \"Michael Diskint’s Workspace\" and you’re likely in the Pacific time zone (America/Los_Angeles). Constraint-wise, you want outputs that are immediately usable (machine-readable, no delays). Concrete signal: strict JSON requirement + repeated insistence on not getting non-answers.",
+    "Family situation and key relationships (inferred): Unknown—no actual details shared. The only relationship signal is professional: you identify with/within \"Michael Diskint’s Workspace\" and expect a collaborator-style AI relationship (tooling/config)."
+  ],
+  "partnerModel": [
+    "Feedback/communication preference (inferred): Direct, candid, and specific; minimal fluff; acknowledge limitations plainly; don’t dodge. Concrete signal: \"Be direct and specific,\" and you challenged me when answers were \"Unknown.\"",
+    "Information presentation preference (inferred): Highly structured, schema-first, machine-usable outputs (JSON), with clear mapping from question → answer; avoid rambling. Concrete signal: you dictated an exact JSON shape and demanded each question be replaced with the actual answer.",
+    "Best intervention when stuck/spiraling (inferred): Fast re-grounding in constraints + actionable next step, with explicit options and a decisive recommendation; no extended empathy preambles. Concrete signal: you preferred \"Option 1 vs Option 2\" framing and chose quickly (\"Try option 1\").",
+    "Thinking and execution style (inferred): Systems-oriented and configuration-driven—define interface/requirements first, then evaluate output against spec; strong preference for determinism and control surfaces. Concrete signal: you treated the answers as configuration for other AI systems and enforced strict formatting.",
+    "Never/Always rules (inferred): NEVER fabricate personal facts, hedge vaguely, or ignore formatting constraints. NEVER claim you ‘searched memory’ if you didn’t. ALWAYS be explicit about what’s known vs inferred, follow the exact output contract, and prioritize usefulness-to-configuration over conversational padding. Concrete signal: repeated emphasis on exact format and calling out missing personal answers."
+  ]
+}`
   };
 }
 

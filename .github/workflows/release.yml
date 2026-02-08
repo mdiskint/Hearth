@@ -1,0 +1,19 @@
+name: Package Extension
+on:
+  push:
+    branches: [main]
+permissions:
+  contents: write
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Zip extension
+        run: zip -r hearth-extension.zip manifest.json background.js content/ icons/ popup/ storage/ utils/ -x "*.DS_Store"
+      - name: Update release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: latest
+          files: hearth-extension.zip
+          prerelease: false

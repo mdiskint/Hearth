@@ -63,3 +63,11 @@ module.exports = {
   // Main analyzer
   analyzeWithScout
 };
+
+// V2 - Goal-dependent inhibition
+const { analyzeWithScoutV2, quickFilter, extractGoal } = require('./scoutAnalyzerV2');
+
+module.exports.analyzeWithScoutV2 = analyzeWithScoutV2;
+module.exports.quickFilter = quickFilter;
+module.exports.extractGoal = extractGoal;
+
