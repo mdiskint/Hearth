@@ -14,11 +14,42 @@
       <h1>👋 Hi, I'm Hearth</h1>
       <p class="subtitle">I'm an AI that adapts to individuals, not averages.</p>
       <p>But I need to understand you first.</p>
-      <p class="highlight">Answer 15 quick questions so I can learn how to work with <strong>you</strong> specifically.</p>
-      <p class="time-estimate">Takes about 3 minutes.</p>
+      <p class="highlight">Answer 10 quick questions so I can learn how to work with <strong>you</strong> specifically.</p>
+      <p class="time-estimate">Takes about 2 minutes.</p>
       <div class="button-group">
         <button id="start-quiz-btn" class="btn-primary">Let's go</button>
         <button id="skip-quiz-btn" class="btn-secondary">Maybe later</button>
+      </div>
+      <div class="auth-link">
+        <button id="welcome-sign-in-btn" class="btn-link">Already have an account? Sign In</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- AUTH SCREEN -->
+  <div id="auth-screen" class="screen hidden">
+    <div class="auth-content">
+      <h1 id="auth-title">Sign In</h1>
+      <p class="auth-subtitle">Sign in to sync your data across devices</p>
+
+      <div id="auth-error" class="auth-error hidden"></div>
+
+      <div class="auth-form">
+        <div class="form-group">
+          <label for="auth-email">Email</label>
+          <input type="email" id="auth-email" placeholder="you@example.com" autocomplete="email">
+        </div>
+        <div class="form-group">
+          <label for="auth-password">Password</label>
+          <input type="password" id="auth-password" placeholder="••••••••" autocomplete="current-password">
+        </div>
+
+        <button id="auth-submit-btn" class="btn-primary auth-btn">Sign In</button>
+      </div>
+
+      <div class="auth-footer">
+        <p id="auth-toggle-text">Don't have an account? <button id="auth-toggle-btn" class="btn-link">Sign Up</button></p>
+        <button id="auth-skip-btn" class="btn-link">Skip for now</button>
       </div>
     </div>
   </div>
@@ -29,7 +60,7 @@
       <div id="progress-fill" class="progress-fill"></div>
     </div>
     <div class="progress-text">
-      <span id="current-question">1</span> / <span id="total-questions">15</span>
+      <span id="current-question">1</span> / <span id="total-questions">10</span>
     </div>
     
     <div class="quiz-content">
@@ -100,9 +131,16 @@
   <div id="dashboard-screen" class="screen hidden">
     <div class="dashboard-header">
       <h2>Hearth</h2>
-      <div class="status-indicator" id="status-indicator">
-        <span class="status-dot active"></span>
-        <span>Active</span>
+      <div class="header-right">
+        <div class="status-indicator" id="status-indicator">
+          <span class="status-dot active"></span>
+          <span>Active</span>
+        </div>
+        <div class="user-indicator hidden" id="user-indicator">
+          <span class="user-avatar" id="user-avatar">?</span>
+          <button id="sign-out-btn" class="btn-link btn-small">Sign Out</button>
+        </div>
+        <button id="sign-in-header-btn" class="btn-secondary btn-small">Sign In</button>
       </div>
     </div>
     
@@ -116,19 +154,6 @@
       <div class="section">
         <div class="section-header">
           <h3>Memories</h3>
-          <button id="extract-now-header-btn" class="btn-secondary">⚡ Extract Now</button>
-          <button id="add-memory-btn" class="btn-secondary">+ Add Memory</button>
-        </div>
-
-        <!-- Memory Type Filters -->
-        <div id="memory-filters" class="memory-filters">
-          <button class="filter-btn active" data-filter="all">All</button>
-          <button class="filter-btn" data-filter="fact">Facts</button>
-          <button class="filter-btn" data-filter="value">Values</button>
-          <button class="filter-btn" data-filter="reward">Rewards</button>
-          <button class="filter-btn" data-filter="synthesis">Synthesis</button>
-          <button class="filter-btn" data-filter="partner_model">Partner</button>
-          <button class="filter-btn" data-filter="self_model">Self</button>
         </div>
 
         <!-- Empty State -->
@@ -150,16 +175,20 @@
         <!-- Memory List -->
         <div id="memory-list" class="memory-list"></div>
       </div>
-      
+
+      <!-- FORGE SECTION -->
+      <div class="forge-section">
+        <div class="forge-header">
+          <h3>🔥 Forge</h3>
+          <input type="checkbox" id="forge-toggle" class="forge-toggle">
+        </div>
+      </div>
+
       <div class="section">
         <h3>Settings</h3>
         <label class="toggle-setting">
           <input type="checkbox" id="enable-injection-toggle" checked>
           <span>Enable context injection</span>
-        </label>
-        <label class="toggle-setting">
-          <input type="checkbox" id="visible-injection-toggle" checked>
-          <span>Show injected context (for debugging)</span>
         </label>
       </div>
       
@@ -176,91 +205,22 @@
         <h3 id="memory-modal-title">Add Memory</h3>
         <button id="close-memory-modal" class="close-btn">&times;</button>
       </div>
-      
+
       <div class="modal-body">
         <div class="form-group">
-          <label for="memory-content">Memory Content <span class="char-count">(<span id="char-count">0</span>/500)</span></label>
+          <label for="memory-content">Memory <span class="char-count">(<span id="char-count">0</span>/500)</span></label>
           <textarea id="memory-content" rows="4" maxlength="500" placeholder="What should I remember about you?"></textarea>
         </div>
-        
-        <div class="form-row">
-          <div class="form-group">
-            <label for="memory-type">Type</label>
-            <select id="memory-type">
-              <option value="fact">Fact - Concrete information</option>
-              <option value="value">Value - What matters to you</option>
-              <option value="reward">Reward - Feedback on a value</option>
-              <option value="synthesis">Synthesis - Pattern/insight</option>
-              <option value="partner_model">Partner Model - About the AI</option>
-              <option value="self_model">Self Model - About yourself</option>
-            </select>
-          </div>
-        </div>
 
-        <div class="form-row">
-          <div class="form-group">
-            <label for="memory-heat">Heat (Importance): <span id="heat-value">0.5</span></label>
-            <input type="range" id="memory-heat" min="0" max="1" step="0.1" value="0.5">
-            <div class="heat-labels">
-              <span>Low</span>
-              <span>High</span>
-            </div>
-          </div>
-        </div>
-
-        <!-- Reward-specific fields (shown conditionally) -->
-        <div id="reward-fields" class="form-row hidden">
-          <div class="form-group">
-            <label for="memory-parent">Linked Value</label>
-            <select id="memory-parent">
-              <option value="">Select a value memory...</option>
-            </select>
-          </div>
-          <div class="form-group">
-            <label for="memory-outcome">Outcome</label>
-            <select id="memory-outcome">
-              <option value="">Select outcome...</option>
-              <option value="+1">+1 (Positive)</option>
-              <option value="0">0 (Neutral)</option>
-              <option value="-1">-1 (Negative)</option>
-            </select>
-          </div>
-        </div>
-        
-        <div class="form-row">
-          <div class="form-group">
-            <label for="memory-domain">Life Domain</label>
-            <select id="memory-domain">
-              <option value="">Select domain...</option>
-              <option value="Work">Work</option>
-              <option value="Relationships">Relationships</option>
-              <option value="Creative">Creative</option>
-              <option value="Self">Self</option>
-              <option value="Decisions">Decisions</option>
-              <option value="Resources">Resources</option>
-              <option value="Values">Values</option>
-            </select>
-          </div>
-          
-          <div class="form-group">
-            <label for="memory-emotion">Emotional State</label>
-            <select id="memory-emotion">
-              <option value="">Select emotion...</option>
-              <option value="Joy">Joy</option>
-              <option value="Curiosity">Curiosity</option>
-              <option value="Pride">Pride</option>
-              <option value="Peace">Peace</option>
-              <option value="Grief">Grief</option>
-              <option value="Fear">Fear</option>
-              <option value="Anxiety">Anxiety</option>
-              <option value="Shame">Shame</option>
-              <option value="Anger">Anger</option>
-              <option value="Care">Care</option>
-            </select>
-          </div>
+        <div class="form-group">
+          <label for="memory-type">Type</label>
+          <select id="memory-type">
+            <option value="fact">Fact - What you know about them</option>
+            <option value="pattern">Pattern - What you've learned</option>
+          </select>
         </div>
       </div>
-      
+
       <div class="modal-footer">
         <button id="cancel-memory-btn" class="btn-secondary">Cancel</button>
         <button id="save-memory-btn" class="btn-primary">Save Memory</button>
@@ -268,8 +228,7 @@
     </div>
   </div>
   
-  <script src="../utils/embeddings.js"></script>
-  <script src="../utils/supabaseSync.js"></script>
+  <script src="../utils/supabase-client.js"></script>
   <script src="../storage/storage.js"></script>
   <script src="../utils/quiz-questions.js"></script>
   <script src="../utils/opspec-generator.js"></script>

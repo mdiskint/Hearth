@@ -3,24 +3,42 @@
 let currentQuestionIndex = 0;
 let answers = {};
 let currentMemoryFilter = 'all';
+let isSignUpMode = false;
 
 // Initialize on load
 document.addEventListener('DOMContentLoaded', async () => {
-  const quizCompleted = await HearthStorage.isQuizCompleted();
-  
-  if (quizCompleted) {
-    showDashboard();
-  } else {
+  console.log('Hearth popup: Initializing...');
+
+  // Always set up event listeners first so buttons work even if storage fails
+  setupEventListeners();
+  console.log('Hearth popup: Event listeners attached');
+
+  try {
+    const quizCompleted = await HearthStorage.isQuizCompleted();
+    console.log('Hearth popup: Quiz completed =', quizCompleted);
+
+    if (quizCompleted) {
+      showDashboard();
+    } else {
+      showScreen('welcome-screen');
+    }
+  } catch (error) {
+    console.error('Hearth popup: Init error', error);
+    // Default to welcome screen if storage fails
     showScreen('welcome-screen');
   }
-  
-  setupEventListeners();
+
+  // Listen for auth state changes
+  if (typeof HearthAuth !== 'undefined') {
+    HearthAuth.onAuthStateChange(updateAuthUI);
+  }
 });
 
 function setupEventListeners() {
   // Welcome screen
   document.getElementById('start-quiz-btn').addEventListener('click', startQuiz);
   document.getElementById('skip-quiz-btn').addEventListener('click', skipQuiz);
+  document.getElementById('welcome-sign-in-btn').addEventListener('click', showAuthScreen);
   
   // Quiz navigation
   document.getElementById('back-btn').addEventListener('click', previousQuestion);
@@ -35,11 +53,9 @@ function setupEventListeners() {
   // Dashboard
   document.getElementById('retake-quiz-dashboard-btn').addEventListener('click', retakeQuiz);
   document.getElementById('enable-injection-toggle').addEventListener('change', toggleInjection);
-  document.getElementById('visible-injection-toggle').addEventListener('change', toggleVisibility);
   document.getElementById('view-edit-opspec-btn').addEventListener('click', viewEditOpSpec);
   
   // Memory management
-  document.getElementById('add-memory-btn').addEventListener('click', openMemoryModal);
   document.getElementById('add-first-memory-btn').addEventListener('click', openMemoryModal);
   document.getElementById('import-memories-btn').addEventListener('click', importMemories);
   document.getElementById('close-memory-modal').addEventListener('click', closeMemoryModal);
@@ -47,22 +63,25 @@ function setupEventListeners() {
   document.getElementById('save-memory-btn').addEventListener('click', saveMemory);
   document.getElementById('memory-content').addEventListener('input', updateCharCount);
 
-  // Heat slider
-  document.getElementById('memory-heat').addEventListener('input', updateHeatValue);
-document.getElementById('extract-now-btn').addEventListener('click', extractNow);
-  document.getElementById('extract-now-header-btn').addEventListener('click', extractNow);
+  // Extract now button
+  document.getElementById('extract-now-btn').addEventListener('click', extractNow);
 
-  // Memory type change (show/hide reward fields)
-  document.getElementById('memory-type').addEventListener('change', onMemoryTypeChange);
+  // Forge toggle
+  document.getElementById('forge-toggle').addEventListener('change', toggleForge);
 
-  // Memory filter buttons
-  document.querySelectorAll('.filter-btn').forEach(btn => {
-    btn.addEventListener('click', (e) => {
-      document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
-      e.target.classList.add('active');
-      currentMemoryFilter = e.target.dataset.filter;
-      loadMemories();
-    });
+  // Auth
+  document.getElementById('auth-submit-btn').addEventListener('click', handleAuthSubmit);
+  document.getElementById('auth-toggle-btn').addEventListener('click', toggleAuthMode);
+  document.getElementById('auth-skip-btn').addEventListener('click', skipAuth);
+  document.getElementById('sign-out-btn').addEventListener('click', handleSignOut);
+  document.getElementById('sign-in-header-btn').addEventListener('click', showAuthScreen);
+
+  // Allow Enter key in auth form
+  document.getElementById('auth-email').addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') document.getElementById('auth-password').focus();
+  });
+  document.getElementById('auth-password').addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') handleAuthSubmit();
   });
 }
 
@@ -74,6 +93,7 @@ function showScreen(screenId) {
 }
 
 function startQuiz() {
+  // Go directly to quiz - auth is optional
   currentQuestionIndex = 0;
   answers = {};
   showScreen('quiz-screen');
@@ -81,7 +101,7 @@ function startQuiz() {
 }
 
 function skipQuiz() {
-  // Use default OpSpec
+  // Go directly to dashboard - auth is optional
   showDashboard();
 }
 
@@ -441,7 +461,6 @@ async function showDashboard() {
   
   // Set toggles
   document.getElementById('enable-injection-toggle').checked = settings.enabled;
-  document.getElementById('visible-injection-toggle').checked = settings.injectionVisible;
   
   // Update status indicator
   const statusDot = document.querySelector('.status-dot');
@@ -456,7 +475,19 @@ async function showDashboard() {
   
   // Load memories
   await loadMemories();
-  
+
+  // Load Forge state
+  const forgeData = await chrome.storage.local.get(['forgeEnabled']);
+  document.getElementById('forge-toggle').checked = forgeData.forgeEnabled || false;
+
+  // Update auth UI
+  if (typeof HearthAuth !== 'undefined') {
+    const user = await HearthAuth.getUser();
+    updateAuthUI(user);
+  } else {
+    updateAuthUI(null);
+  }
+
   showScreen('dashboard-screen');
 }
 
@@ -465,8 +496,177 @@ async function toggleInjection(e) {
   showDashboard();
 }
 
-async function toggleVisibility(e) {
-  await HearthStorage.updateSettings({ injectionVisible: e.target.checked });
+function toggleForge(e) {
+  chrome.storage.local.set({ forgeEnabled: e.target.checked });
+}
+
+// ==================== AUTH ====================
+
+function showAuthScreen() {
+  isSignUpMode = false;
+  updateAuthModeUI();
+  clearAuthError();
+  document.getElementById('auth-email').value = '';
+  document.getElementById('auth-password').value = '';
+  showScreen('auth-screen');
+}
+
+function toggleAuthMode() {
+  isSignUpMode = !isSignUpMode;
+  updateAuthModeUI();
+  clearAuthError();
+}
+
+function updateAuthModeUI() {
+  const title = document.getElementById('auth-title');
+  const submitBtn = document.getElementById('auth-submit-btn');
+  const toggleText = document.getElementById('auth-toggle-text');
+
+  if (isSignUpMode) {
+    title.textContent = 'Create Account';
+    submitBtn.textContent = 'Sign Up';
+    toggleText.innerHTML = 'Already have an account? <button id="auth-toggle-btn" class="btn-link">Sign In</button>';
+  } else {
+    title.textContent = 'Sign In';
+    submitBtn.textContent = 'Sign In';
+    toggleText.innerHTML = 'Don\'t have an account? <button id="auth-toggle-btn" class="btn-link">Sign Up</button>';
+  }
+
+  // Re-attach toggle listener
+  document.getElementById('auth-toggle-btn').addEventListener('click', toggleAuthMode);
+}
+
+async function handleAuthSubmit() {
+  console.log('Hearth: handleAuthSubmit called');
+  const email = document.getElementById('auth-email').value.trim();
+  const password = document.getElementById('auth-password').value;
+
+  if (!email || !password) {
+    showAuthError('Please enter email and password');
+    return;
+  }
+
+  if (password.length < 6) {
+    showAuthError('Password must be at least 6 characters');
+    return;
+  }
+
+  const submitBtn = document.getElementById('auth-submit-btn');
+  submitBtn.disabled = true;
+  submitBtn.textContent = isSignUpMode ? 'Creating account...' : 'Signing in...';
+
+  try {
+    console.log('Hearth: Calling HearthAuth...', typeof HearthAuth);
+    if (typeof HearthAuth === 'undefined') {
+      showAuthError('Auth service not available. Please reload the extension.');
+      submitBtn.disabled = false;
+      submitBtn.textContent = isSignUpMode ? 'Sign Up' : 'Sign In';
+      return;
+    }
+
+    let result;
+    if (isSignUpMode) {
+      result = await HearthAuth.signUp(email, password);
+      console.log('Hearth: signUp result', result);
+      if (result.needsConfirmation) {
+        showAuthError('Check your email to confirm your account, then sign in.');
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Sign Up';
+        isSignUpMode = false;
+        updateAuthModeUI();
+        return;
+      }
+    } else {
+      result = await HearthAuth.signIn(email, password);
+      console.log('Hearth: signIn result', result);
+    }
+
+    if (result.error) {
+      console.log('Hearth: Auth error', result.error);
+      showAuthError(result.error);
+      submitBtn.disabled = false;
+      submitBtn.textContent = isSignUpMode ? 'Sign Up' : 'Sign In';
+      return;
+    }
+
+    // Success - proceed with pending action
+    console.log('Hearth: Auth success, proceeding...');
+    await proceedAfterAuth();
+  } catch (error) {
+    console.error('Hearth: handleAuthSubmit error', error);
+    showAuthError(error.message || 'Authentication failed');
+    submitBtn.disabled = false;
+    submitBtn.textContent = isSignUpMode ? 'Sign Up' : 'Sign In';
+  }
+}
+
+async function skipAuth() {
+  // Clear pending action and proceed without auth
+  const data = await chrome.storage.local.get(['pendingAction']);
+  await chrome.storage.local.remove(['pendingAction']);
+
+  if (data.pendingAction === 'startQuiz') {
+    startQuiz();
+  } else {
+    showDashboard();
+  }
+}
+
+async function proceedAfterAuth() {
+  console.log('Hearth: proceedAfterAuth called');
+  const data = await chrome.storage.local.get(['pendingAction']);
+  await chrome.storage.local.remove(['pendingAction']);
+  console.log('Hearth: pendingAction was', data.pendingAction);
+
+  if (data.pendingAction === 'startQuiz') {
+    startQuiz();
+  } else {
+    showDashboard();
+  }
+}
+
+async function handleSignOut() {
+  if (typeof HearthAuth !== 'undefined') {
+    await HearthAuth.signOut();
+  }
+  updateAuthUI(null);
+}
+
+function showAuthError(message) {
+  const errorEl = document.getElementById('auth-error');
+  errorEl.textContent = message;
+  errorEl.classList.remove('hidden');
+}
+
+function clearAuthError() {
+  const errorEl = document.getElementById('auth-error');
+  errorEl.textContent = '';
+  errorEl.classList.add('hidden');
+}
+
+function updateAuthUI(user) {
+  console.log('Hearth: updateAuthUI called, user =', user?.email || 'null');
+
+  const userIndicator = document.getElementById('user-indicator');
+  const signInBtn = document.getElementById('sign-in-header-btn');
+  const userAvatar = document.getElementById('user-avatar');
+
+  if (user) {
+    // User is signed in - show user indicator, hide sign-in button
+    userIndicator.classList.remove('hidden');
+    signInBtn.classList.add('hidden');
+
+    // Set avatar to first letter of email
+    const initial = user.email ? user.email[0].toUpperCase() : '?';
+    userAvatar.textContent = initial;
+    userAvatar.title = user.email;
+    console.log('Hearth: Showing signed-in UI for', user.email);
+  } else {
+    // User is signed out - hide user indicator, show sign-in button
+    userIndicator.classList.add('hidden');
+    signInBtn.classList.remove('hidden');
+    console.log('Hearth: Showing signed-out UI');
+  }
 }
 
 // Memory Management
@@ -477,9 +677,9 @@ async function loadMemories() {
   const memoryList = document.getElementById('memory-list');
   const emptyState = document.getElementById('memory-empty-state');
 
-  // Apply filter
+  // Apply filter by memory_class (new schema)
   if (currentMemoryFilter !== 'all') {
-    memories = memories.filter(m => m.type === currentMemoryFilter);
+    memories = memories.filter(m => m.memory_class === currentMemoryFilter);
   }
 
   if (memories.length === 0) {
@@ -506,48 +706,33 @@ function createMemoryCard(memory) {
   card.className = 'memory-card';
   card.dataset.memoryId = memory.id;
 
-  // Validation state indicator
-  const validationState = memory.validation?.state || 'untested';
-  const validationIcon = {
-    'validated': '✓',
-    'untested': '?',
-    'invalidated': '✗'
-  }[validationState];
-  const validationClass = `validation-${validationState}`;
+  // Use new schema field names (content, memory_class, created_at)
+  const memoryClass = memory.memory_class || 'fact';
+  const typeBadge = `<span class="memory-badge type-${memoryClass}">${memoryClass}</span>`;
+  const sourceBadge = `<span class="memory-badge source-${memory.source}">${memory.source}</span>`;
 
-  // Heat indicator (visual bar)
+  // Format date - use created_at (new schema)
+  const createdDate = memory.created_at ? new Date(memory.created_at).toLocaleDateString() : '';
+
+  // Heat indicator
   const heat = memory.heat ?? 0.5;
   const heatPercent = Math.round(heat * 100);
 
-  const typeBadge = `<span class="memory-badge type-${memory.type}">${memory.type}</span>`;
-  const domainBadge = memory.domain ? `<span class="memory-badge">${memory.domain}</span>` : '';
-  const validationBadge = `<span class="memory-badge ${validationClass}">${validationIcon}</span>`;
-
   card.innerHTML = `
     <div class="memory-header">
-      <div class="memory-content">${memory.content}</div>
+      <div class="memory-text">${memory.content || ''}</div>
       <div class="memory-badges">
-        ${validationBadge}
         ${typeBadge}
-        ${domainBadge}
+        ${sourceBadge}
       </div>
     </div>
     <div class="memory-details">
       <div class="memory-meta">
-        ${memory.domain ? `<div class="memory-meta-item"><span class="memory-meta-label">Domain:</span> ${memory.domain}</div>` : ''}
-        ${memory.emotion ? `<div class="memory-meta-item"><span class="memory-meta-label">Emotion:</span> ${memory.emotion}</div>` : ''}
-        <div class="memory-meta-item"><span class="memory-meta-label">Type:</span> ${memory.type}</div>
+        <div class="memory-meta-item"><span class="memory-meta-label">Class:</span> ${memoryClass}</div>
         <div class="memory-meta-item"><span class="memory-meta-label">Heat:</span> ${heatPercent}%</div>
-        <div class="memory-meta-item"><span class="memory-meta-label">Status:</span> ${validationState}</div>
-        ${memory.parentId ? `<div class="memory-meta-item"><span class="memory-meta-label">Linked to:</span> ${memory.parentId}</div>` : ''}
-        ${memory.outcome ? `<div class="memory-meta-item"><span class="memory-meta-label">Outcome:</span> ${memory.outcome}</div>` : ''}
-      </div>
-      <div class="heat-bar">
-        <div class="heat-fill" style="width: ${heatPercent}%"></div>
+        <div class="memory-meta-item"><span class="memory-meta-label">Created:</span> ${createdDate}</div>
       </div>
       <div class="memory-actions">
-        <button class="btn-success btn-small validate-memory-btn" data-id="${memory.id}" title="Mark as validated">✓</button>
-        <button class="btn-warning btn-small invalidate-memory-btn" data-id="${memory.id}" title="Mark as invalidated">✗</button>
         <button class="btn-secondary btn-small edit-memory-btn" data-id="${memory.id}">Edit</button>
         <button class="btn-danger btn-small delete-memory-btn" data-id="${memory.id}">Delete</button>
       </div>
@@ -559,18 +744,6 @@ function createMemoryCard(memory) {
     if (!e.target.classList.contains('btn-small')) {
       card.classList.toggle('expanded');
     }
-  });
-
-  // Validate button
-  card.querySelector('.validate-memory-btn').addEventListener('click', (e) => {
-    e.stopPropagation();
-    validateMemory(memory.id);
-  });
-
-  // Invalidate button
-  card.querySelector('.invalidate-memory-btn').addEventListener('click', (e) => {
-    e.stopPropagation();
-    invalidateMemory(memory.id);
   });
 
   // Edit button
@@ -592,35 +765,19 @@ async function openMemoryModal(editMemory = null) {
   const modal = document.getElementById('memory-modal');
   const title = document.getElementById('memory-modal-title');
 
-  // Populate value memories for reward linking
-  await populateValueMemories();
-
   if (editMemory) {
     title.textContent = 'Edit Memory';
     currentEditingMemoryId = editMemory.id;
-    document.getElementById('memory-content').value = editMemory.content;
-    document.getElementById('memory-type').value = editMemory.type;
-    document.getElementById('memory-heat').value = editMemory.heat ?? 0.5;
-    document.getElementById('heat-value').textContent = editMemory.heat ?? 0.5;
-    document.getElementById('memory-domain').value = editMemory.domain || '';
-    document.getElementById('memory-emotion').value = editMemory.emotion || '';
-    document.getElementById('memory-parent').value = editMemory.parentId || '';
-    document.getElementById('memory-outcome').value = editMemory.outcome || '';
+    // Use new schema field names (content, memory_class)
+    document.getElementById('memory-content').value = editMemory.content || '';
+    document.getElementById('memory-type').value = editMemory.memory_class || 'fact';
   } else {
     title.textContent = 'Add Memory';
     currentEditingMemoryId = null;
     document.getElementById('memory-content').value = '';
     document.getElementById('memory-type').value = 'fact';
-    document.getElementById('memory-heat').value = 0.5;
-    document.getElementById('heat-value').textContent = '0.5';
-    document.getElementById('memory-domain').value = '';
-    document.getElementById('memory-emotion').value = '';
-    document.getElementById('memory-parent').value = '';
-    document.getElementById('memory-outcome').value = '';
   }
 
-  // Show/hide reward fields based on type
-  onMemoryTypeChange();
   updateCharCount();
   modal.classList.remove('hidden');
 }
@@ -633,12 +790,7 @@ function closeMemoryModal() {
 
 async function saveMemory() {
   const content = document.getElementById('memory-content').value.trim();
-  const type = document.getElementById('memory-type').value;
-  const heat = parseFloat(document.getElementById('memory-heat').value);
-  const domain = document.getElementById('memory-domain').value;
-  const emotion = document.getElementById('memory-emotion').value;
-  const parentId = document.getElementById('memory-parent').value;
-  const outcome = document.getElementById('memory-outcome').value;
+  const memoryClass = document.getElementById('memory-type').value; // 'fact' or 'pattern'
 
   if (!content) {
     alert('Please enter memory content');
@@ -650,19 +802,17 @@ async function saveMemory() {
     return;
   }
 
+  // Use new schema field names
   const memory = {
     content,
-    type,
-    heat,
-    domain: domain || null,
-    emotion: emotion || null,
-    parentId: parentId || null,
-    outcome: outcome || null
+    memory_class: memoryClass,
+    type: memoryClass, // type mirrors memory_class for now
+    source: 'manual'
   };
 
   try {
     if (currentEditingMemoryId) {
-      await HearthStorage.updateMemory(currentEditingMemoryId, memory);
+      await HearthStorage.updateMemory(currentEditingMemoryId, { content, memory_class: memoryClass });
     } else {
       await HearthStorage.saveMemory(memory);
     }
@@ -832,59 +982,6 @@ function showImportSuccess(message) {
   }, 3000);
 }
 
-// Heat slider update
-function updateHeatValue() {
-  const heat = document.getElementById('memory-heat').value;
-  document.getElementById('heat-value').textContent = heat;
-}
-
-// Show/hide reward-specific fields based on memory type
-function onMemoryTypeChange() {
-  const type = document.getElementById('memory-type').value;
-  const rewardFields = document.getElementById('reward-fields');
-
-  if (type === 'reward') {
-    rewardFields.classList.remove('hidden');
-  } else {
-    rewardFields.classList.add('hidden');
-  }
-}
-
-// Populate value memories dropdown for reward linking
-async function populateValueMemories() {
-  const valueMemories = await HearthStorage.getMemoriesByType('value');
-  const select = document.getElementById('memory-parent');
-
-  // Keep the first option, clear the rest
-  select.innerHTML = '<option value="">Select a value memory...</option>';
-
-  valueMemories.forEach(memory => {
-    const option = document.createElement('option');
-    option.value = memory.id;
-    option.textContent = memory.content.substring(0, 50) + (memory.content.length > 50 ? '...' : '');
-    select.appendChild(option);
-  });
-}
-
-// Validate a memory
-async function validateMemory(id) {
-  try {
-    await HearthStorage.validateMemory(id);
-    await loadMemories();
-  } catch (error) {
-    alert(`Error validating memory: ${error.message}`);
-  }
-}
-
-// Invalidate a memory
-async function invalidateMemory(id) {
-  try {
-    await HearthStorage.invalidateMemory(id);
-    await loadMemories();
-  } catch (error) {
-    alert(`Error invalidating memory: ${error.message}`);
-  }
-}
 async function extractNow() {
   try {
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });

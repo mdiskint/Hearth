@@ -1,12 +1,19 @@
-// injector.js - OpSpec injection logic
+// injector.js - OpSpec injection logic with V2 semantic retrieval
 
 const HearthInjector = {
   platform: null,
   opspec: null,
   settings: null,
-  memories: null,
-  openaiApiKey: null,
-  patternEvidence: null,  // NEW: Pattern evidence for confidence calibration
+  memories: null,           // Full memory cache
+  lastUserMessage: null,
+  lastQueryHeat: 0,
+  pendingMemories: [],
+  liveExtractionEnabled: true,
+  _flushTimer: null,
+  openaiKey: null,
+  forgeEnabled: false,
+  forgePhase: null,
+  forgeAutoDetect: true,
 
   async init() {
     this.platform = detectPlatform();
@@ -18,7 +25,7 @@ const HearthInjector = {
 
     console.log(`Hearth: Detected ${this.platform.name}`);
 
-    // Load OpSpec and settings
+    // Load OpSpec, settings, and OpenAI key
     await this.loadData();
 
     // Start monitoring for input
@@ -30,18 +37,35 @@ const HearthInjector = {
 
   async loadData() {
     try {
-      const data = await chrome.storage.local.get(['opspec', 'settings', 'memories', 'openaiApiKey', 'patternEvidence']);
+      const data = await chrome.storage.local.get(['opspec', 'settings', 'openaiKey', 'liveExtractionEnabled', 'forgeEnabled', 'forgePhase', 'forgeAutoDetect', 'hearth_memories']);
       this.opspec = data.opspec;
       this.settings = data.settings || { enabled: true };
-      this.memories = data.memories || [];
-      this.openaiApiKey = data.openaiApiKey || null;
-      this.patternEvidence = data.patternEvidence || {};  // NEW
+      this.openaiKey = data.openaiKey || null;
+      this.liveExtractionEnabled = data.liveExtractionEnabled || false;
+      this.forgeEnabled = data.forgeEnabled || false;
+      this.forgePhase = data.forgePhase || null;
+      this.forgeAutoDetect = data.forgeAutoDetect !== false; // Default true
+
+      // Load local memories for fallback injection
+      this.localMemories = data.hearth_memories || [];
+
+      // Set OpenAI key for embeddings
+      if (this.openaiKey && window.HearthSupabase) {
+        window.HearthSupabase.setOpenAIKey(this.openaiKey);
+        console.log('Hearth: OpenAI key configured for embeddings');
+      }
+
+      // Load all memories (will be filtered at retrieval time)
+      this.memories = window.HearthSupabase
+        ? await window.HearthSupabase.fetchMemories()
+        : [];
 
       console.log('Hearth: Loaded data -',
         'OpSpec:', !!this.opspec,
         'Memories:', this.memories.length,
-        'OpenAI Key:', !!this.openaiApiKey,
-        'Pattern Evidence:', Object.keys(this.patternEvidence).length, 'patterns'  // NEW
+        'Local memories:', this.localMemories.length,
+        'OpenAI Key:', this.openaiKey ? 'set' : 'not set',
+        'Forge:', this.forgeEnabled ? (this.forgeAutoDetect ? 'auto' : this.forgePhase) : 'off'
       );
     } catch (error) {
       console.error('Hearth: Error loading data:', error);
@@ -52,41 +76,75 @@ const HearthInjector = {
     // Inject the fetch interceptor and send data
     this.setupFetchInterceptor();
 
-    // Listen for messages from page context (conversation monitor)
+    // Listen for messages from page context (conversation monitor + fetch proxy)
     window.addEventListener('message', async (event) => {
       if (!event.data || !event.data.type) return;
 
+      // Proxy fetch requests from page context (CSP bypass)
+      // hearth-retrieval.js runs in page context and can't make cross-origin
+      // requests due to the host page's CSP. We relay them here in the content
+      // script, which bypasses page CSP.
+      if (event.data.type === 'HEARTH_PROXY_FETCH') {
+        const { id, url, options } = event.data;
+        try {
+          const res = await fetch(url, options);
+          const body = await res.json();
+          window.postMessage({
+            type: 'HEARTH_PROXY_FETCH_RESPONSE',
+            id,
+            ok: res.ok,
+            status: res.status,
+            body,
+          }, '*');
+        } catch (err) {
+          window.postMessage({
+            type: 'HEARTH_PROXY_FETCH_RESPONSE',
+            id,
+            error: err.message,
+          }, '*');
+        }
+        return;
+      }
+
       // Handle setting changes
       if (event.data.type === 'HEARTH_MONITOR_SETTING_CHANGE') {
-        // Persist setting change to chrome.storage
+        this.liveExtractionEnabled = event.data.liveExtractionEnabled;
         chrome.storage.local.set({
           liveExtractionEnabled: event.data.liveExtractionEnabled
         });
         console.log('Hearth: Persisted live extraction setting:', event.data.liveExtractionEnabled);
       }
 
-      // Handle memory save requests from conversation monitor
-      if (event.data.type === 'HEARTH_SAVE_MEMORY' && event.data.memory) {
-        try {
-          // HearthStorage is available in content script context
-          if (typeof HearthStorage !== 'undefined' && HearthStorage.saveMemory) {
-            await HearthStorage.saveMemory(event.data.memory);
-            console.log('Hearth: Saved live memory:', event.data.memory.content.substring(0, 50) + '...');
-          } else {
-            console.error('Hearth: HearthStorage not available for saving memory');
-          }
-        } catch (error) {
-          console.error('Hearth: Failed to save live memory:', error.message);
+      // Capture user messages for retrieval
+      if (event.data.type === 'HEARTH_CONVERSATION_MESSAGE' && event.data.role === 'user') {
+        this.lastUserMessage = event.data.content;
+
+        // Calculate query heat (still used by other subsystems)
+        if (window.detectQueryHeat) {
+          this.lastQueryHeat = window.detectQueryHeat(event.data.content);
+          console.log('Hearth: Query heat:', this.lastQueryHeat);
         }
+
+        // Trigger data send to fetch interceptor
+        await this.sendDataToInterceptor();
       }
 
-      // NEW: Handle pattern evidence from fetch interceptor
-      if (event.data.type === 'HEARTH_NEW_EVIDENCE' && event.data.evidence) {
-        try {
-          await this.appendEvidenceBatch(event.data.evidence);
-          console.log('Hearth: Persisted', event.data.evidence.length, 'new evidence records');
-        } catch (error) {
-          console.error('Hearth: Failed to persist evidence:', error.message);
+      // Extract AI memories from assistant responses
+      if (event.data.type === 'HEARTH_CONVERSATION_MESSAGE' && event.data.role === 'assistant') {
+        if (this.liveExtractionEnabled && window.HearthAIMemoryExtractor) {
+          try {
+            const aiMemory = window.HearthAIMemoryExtractor.processAssistantResponse(
+              event.data.content,
+              { userMessage: this.lastUserMessage }
+            );
+            if (aiMemory) {
+              this.pendingMemories.push(aiMemory);
+              console.log('Hearth: Extracted AI memory:', aiMemory.type, '- pending:', this.pendingMemories.length);
+              this.debouncedFlush();
+            }
+          } catch (e) {
+            console.warn('Hearth: AI memory extraction failed:', e);
+          }
         }
       }
     });
@@ -104,21 +162,33 @@ const HearthInjector = {
           this.settings = changes.settings.newValue;
           dataChanged = true;
         }
-        if (changes.memories) {
-          this.memories = changes.memories.newValue;
+        if (changes.openaiKey) {
+          this.openaiKey = changes.openaiKey.newValue;
           dataChanged = true;
+          if (this.openaiKey && window.HearthSupabase) {
+            window.HearthSupabase.setOpenAIKey(this.openaiKey);
+          }
         }
-        if (changes.openaiApiKey) {
-          this.openaiApiKey = changes.openaiApiKey.newValue;
-          dataChanged = true;
+        if (changes.liveExtractionEnabled) {
+          this.liveExtractionEnabled = changes.liveExtractionEnabled.newValue;
+          console.log('Hearth: Live extraction setting changed:', this.liveExtractionEnabled);
         }
-        // NEW: Track pattern evidence changes
-        if (changes.patternEvidence) {
-          this.patternEvidence = changes.patternEvidence.newValue;
+        if (changes.forgeEnabled) {
+          this.forgeEnabled = changes.forgeEnabled.newValue;
           dataChanged = true;
+          console.log('Hearth: Forge enabled changed:', this.forgeEnabled);
+        }
+        if (changes.forgePhase) {
+          this.forgePhase = changes.forgePhase.newValue;
+          dataChanged = true;
+          console.log('Hearth: Forge phase changed:', this.forgePhase);
+        }
+        if (changes.forgeAutoDetect) {
+          this.forgeAutoDetect = changes.forgeAutoDetect.newValue;
+          dataChanged = true;
+          console.log('Hearth: Forge auto-detect changed:', this.forgeAutoDetect);
         }
 
-        // Send updated data to fetch interceptor
         if (dataChanged) {
           this.sendDataToInterceptor();
         }
@@ -126,52 +196,51 @@ const HearthInjector = {
     });
   },
 
-  // NEW: Append evidence records to chrome.storage
-  async appendEvidenceBatch(evidenceArray) {
-    if (!evidenceArray || evidenceArray.length === 0) return;
+  debouncedFlush() {
+    if (this._flushTimer) clearTimeout(this._flushTimer);
+    this._flushTimer = setTimeout(() => {
+      this._flushTimer = null;
+      this.flushPendingMemories();
+    }, 5000);
+  },
 
-    const maxPerPattern = 100;  // Pruning limit
+  async flushPendingMemories() {
+    if (this.pendingMemories.length === 0) {
+      return;
+    }
 
-    try {
-      const data = await chrome.storage.local.get('patternEvidence');
-      const allEvidence = data.patternEvidence || {};
+    if (!window.HearthSupabase?.writeMemory) {
+      console.warn('Hearth: HearthSupabase.writeMemory not available, cannot flush');
+      return;
+    }
 
-      for (const evidence of evidenceArray) {
-        if (!allEvidence[evidence.pattern_id]) {
-          allEvidence[evidence.pattern_id] = [];
+    // Grab batch and clear immediately to prevent double-flush
+    const batch = this.pendingMemories;
+    this.pendingMemories = [];
+    console.log(`Hearth: Flushing ${batch.length} pending memories`);
+
+    for (const candidate of batch) {
+      try {
+        // Strip metadata (not a DB column) and map field names to match Supabase schema
+        const { metadata, ...memoryData } = candidate;
+        memoryData.domain = memoryData.life_domain ? memoryData.life_domain.charAt(0).toUpperCase() + memoryData.life_domain.slice(1) : null;
+        memoryData.emotion = memoryData.emotional_state ? memoryData.emotional_state.charAt(0).toUpperCase() + memoryData.emotional_state.slice(1) : null;
+
+        const result = await window.HearthSupabase.writeMemory(memoryData);
+        if (result) {
+          this.memories.push(result);
+          console.log('Hearth: Wrote memory:', memoryData.type, result.id);
+        } else {
+          console.warn('Hearth: writeMemory returned null for:', memoryData.type);
         }
-
-        // Add unique ID if not present
-        if (!evidence.id) {
-          evidence.id = `${evidence.pattern_id}_${evidence.polarity}_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
-        }
-
-        // Set timestamp if not present
-        if (!evidence.observed_at) {
-          evidence.observed_at = new Date().toISOString();
-        }
-
-        allEvidence[evidence.pattern_id].push(evidence);
+      } catch (e) {
+        console.error('Hearth: writeMemory failed for:', candidate.type, e);
       }
-
-      // Prune all patterns that exceed limit
-      for (const patternId of Object.keys(allEvidence)) {
-        if (allEvidence[patternId].length > maxPerPattern) {
-          allEvidence[patternId] = allEvidence[patternId]
-            .sort((a, b) => new Date(b.observed_at) - new Date(a.observed_at))
-            .slice(0, maxPerPattern);
-        }
-      }
-
-      await chrome.storage.local.set({ patternEvidence: allEvidence });
-      this.patternEvidence = allEvidence;
-    } catch (error) {
-      console.error('Hearth: Failed to append evidence batch:', error);
     }
   },
 
   setupFetchInterceptor() {
-    if (!this.settings || !this.settings.enabled) {
+    if (!this.settings?.enabled) {
       console.log('Hearth: Disabled, skipping fetch interceptor');
       return;
     }
@@ -181,81 +250,111 @@ const HearthInjector = {
       return;
     }
 
-    // Inject the fetch interceptor script
-    const fetchScript = document.createElement('script');
-    fetchScript.src = chrome.runtime.getURL('content/fetch-interceptor.js');
-    fetchScript.onload = () => {
-      console.log('Hearth: Fetch interceptor loaded');
-
-      // After fetch interceptor is loaded, inject conversation monitor
-      this.injectConversationMonitor();
-
-      // Send data via postMessage
-      this.sendDataToInterceptor();
+    // Inject heatDetector first
+    const heatScript = document.createElement('script');
+    heatScript.src = chrome.runtime.getURL('utils/heatDetector.js');
+    heatScript.onload = () => {
+      console.log('Hearth: Heat detector loaded');
     };
-    fetchScript.onerror = (e) => {
-      console.error('Hearth: Failed to load fetch interceptor', e);
+    (document.head || document.documentElement).appendChild(heatScript);
+
+    // Inject OpSpec modules
+    const modulesScript = document.createElement('script');
+    modulesScript.src = chrome.runtime.getURL('opspec-modules.js');
+    modulesScript.onload = () => {
+      console.log('Hearth: OpSpec modules loaded');
+
+      // Inject Scout V2 modules
+      this.injectExtraModules().then(() => {
+        // Finally inject the fetch interceptor
+        const fetchScript = document.createElement('script');
+        fetchScript.src = chrome.runtime.getURL('content/fetch-interceptor.js');
+        fetchScript.onload = () => {
+          console.log('Hearth: Fetch interceptor loaded');
+          this.sendDataToInterceptor();
+        };
+        fetchScript.onerror = (e) => {
+          console.error('Hearth: Failed to load fetch interceptor', e);
+        };
+        (document.head || document.documentElement).appendChild(fetchScript);
+      });
     };
-    (document.head || document.documentElement).appendChild(fetchScript);
+    modulesScript.onerror = (e) => {
+      console.error('Hearth: Failed to load OpSpec modules', e);
+    };
+    (document.head || document.documentElement).appendChild(modulesScript);
   },
 
-  injectConversationMonitor() {
-    // First inject modelRouter so it's available for conversation monitor
-    const routerScript = document.createElement('script');
-    routerScript.src = chrome.runtime.getURL('utils/modelRouter.js');
-    routerScript.onload = () => {
-      console.log('Hearth: Model router loaded into page context');
+  async injectExtraModules() {
+    const modules = [
+      'utils/affectDetector.js',
+      'utils/forgeDetector.js',
+      'utils/durabilityClassifier.js',
+      'utils/scout/goalExtractor.js',
+      'utils/scout/memoryFilter.js',
+      'utils/scout/scoutAnalyzerV2.js',
+      'utils/memoryExtractor.js',
+      'utils/aiMemoryExtractor.js',
+      'src/retrieval/hearth-retrieval.js'
+    ];
 
-      // Then inject the conversation monitor script into page context
-      const monitorScript = document.createElement('script');
-      monitorScript.src = chrome.runtime.getURL('content-script/conversationMonitor.js');
-      monitorScript.onload = () => {
-        console.log('Hearth: Conversation monitor loaded into page context');
+    for (const modulePath of modules) {
+      try {
+        await new Promise((resolve, reject) => {
+          const script = document.createElement('script');
+          script.src = chrome.runtime.getURL(modulePath);
+          script.onload = () => {
+            console.log(`Hearth: Loaded ${modulePath}`);
+            resolve();
+          };
+          script.onerror = () => {
+            console.warn(`Hearth: Failed to load module ${modulePath}, skipping`);
+            // Resolve anyway to continue loading other modules
+            resolve();
+          };
+          (document.head || document.documentElement).appendChild(script);
+        });
+      } catch (e) {
+        console.warn(`Hearth: Error injecting ${modulePath}`, e);
+      }
+    }
 
-        // Send initial settings to the monitor
-        this.sendSettingsToMonitor();
-      };
-      monitorScript.onerror = (e) => {
-        console.error('Hearth: Failed to load conversation monitor', e);
-      };
-      (document.head || document.documentElement).appendChild(monitorScript);
-    };
-    routerScript.onerror = (e) => {
-      console.error('Hearth: Failed to load model router', e);
-    };
-    (document.head || document.documentElement).appendChild(routerScript);
+    // Debug: Confirm key detectors loaded in page context
+    // Inject a tiny script to log from page context
+    setTimeout(() => {
+      const checkScript = document.createElement('script');
+      checkScript.textContent = `
+        console.log('Hearth: Page context check -',
+          'HearthForgeDetector:', typeof window.HearthForgeDetector !== 'undefined' ? 'loaded' : 'MISSING',
+          'HearthAffectDetector:', typeof window.HearthAffectDetector !== 'undefined' ? 'loaded' : 'MISSING'
+        );
+      `;
+      document.head.appendChild(checkScript);
+      checkScript.remove();
+    }, 100);
   },
 
-  sendSettingsToMonitor() {
-    // Send API key and settings to conversation monitor in page context
-    chrome.storage.local.get(['anthropicApiKey', 'liveExtractionEnabled'], (data) => {
-      window.postMessage({
-        type: 'HEARTH_MONITOR_SETTINGS',
-        anthropicApiKey: data.anthropicApiKey || null,
-        liveExtractionEnabled: data.liveExtractionEnabled || false
-      }, '*');
-      console.log('Hearth: Settings sent to conversation monitor');
-    });
-  },
-
-  sendDataToInterceptor() {
-    // Send raw data to fetch interceptor for semantic retrieval
+  async sendDataToInterceptor() {
+    console.log('Hearth: sendDataToInterceptor',
+      'opspec:', !!this.opspec,
+      'openaiKey:', !!this.openaiKey,
+      'queryHeat:', this.lastQueryHeat,
+      'forge:', this.forgeEnabled ? (this.forgeAutoDetect ? 'auto' : this.forgePhase) : 'off'
+    );
+    // Send data to fetch interceptor (affect + retrieval handled in page context)
     window.postMessage({
       type: 'HEARTH_DATA',
       opspec: this.opspec,
-      memories: this.memories,
-      openaiApiKey: this.openaiApiKey,
-      patternEvidence: this.patternEvidence  // NEW
+      queryHeat: this.lastQueryHeat,
+      openaiKey: this.openaiKey,
+      forgeEnabled: this.forgeEnabled,
+      forgePhase: this.forgePhase,
+      forgeAutoDetect: this.forgeAutoDetect
     }, '*');
-
-    console.log('Hearth: Data sent to fetch interceptor -',
-      'Memories:', this.memories?.length || 0,
-      'Has API Key:', !!this.openaiApiKey,
-      'Pattern Evidence:', Object.keys(this.patternEvidence || {}).length, 'patterns'  // NEW
-    );
   },
 
   cleanup() {
+    this.flushPendingMemories();
     console.log('Hearth: Cleaned up');
   }
 };
@@ -263,4 +362,38 @@ const HearthInjector = {
 // Auto-initialize when script loads
 if (typeof chrome !== 'undefined' && chrome.storage) {
   HearthInjector.init();
+}
+
+// Listen for messages from popup
+if (typeof chrome !== 'undefined' && chrome.runtime) {
+  chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    if (message.type === 'HEARTH_FLUSH_MEMORIES') {
+      HearthInjector.flushPendingMemories().then(() => {
+        sendResponse({ success: true, flushed: HearthInjector.pendingMemories.length === 0 });
+      });
+      return true;
+    }
+
+    if (message.type === 'HEARTH_BACKFILL_EMBEDDINGS') {
+      if (window.HearthSupabase?.backfillEmbeddings) {
+        window.HearthSupabase.backfillEmbeddings(50).then(count => {
+          sendResponse({ success: true, updated: count });
+        });
+      } else {
+        sendResponse({ success: false, error: 'Supabase not available' });
+      }
+      return true;
+    }
+
+    if (message.type === 'HEARTH_GET_DIMENSIONAL_COVERAGE') {
+      if (window.HearthSupabase?.getDimensionalCoverage) {
+        window.HearthSupabase.getDimensionalCoverage().then(data => {
+          sendResponse({ success: true, ...data });
+        });
+      } else {
+        sendResponse({ success: false, error: 'Supabase not available' });
+      }
+      return true;
+    }
+  });
 }

@@ -1,22 +1,29 @@
-// storage.js - LocalStorage wrapper for Hearth data
+// storage.js - LocalStorage wrapper for Hearth data with Supabase sync
 
-// 17 Dimensions: 7 Life Domains × 10 Emotional States
-const DIMENSIONS = {
-  domains: ['Work', 'Relationships', 'Creative', 'Self', 'Decisions', 'Resources', 'Values'],
-  emotions: ['Joy', 'Curiosity', 'Pride', 'Peace', 'Grief', 'Fear', 'Anxiety', 'Shame', 'Anger', 'Care']
-};
+// Memory classes: fact = what you know, pattern = what you've learned
+const MEMORY_CLASSES = ['fact', 'pattern'];
 
-// Enhanced memory types
-const MEMORY_TYPES = ['fact', 'value', 'reward', 'synthesis', 'partner_model', 'self_model'];
+// Memory types (Supabase schema)
+const MEMORY_TYPES = ['fact', 'value', 'partner_model', 'reward', 'synthesis', 'self_model'];
 
-// Validation states for memories
+// Memory domains
+const MEMORY_DOMAINS = ['Work', 'Relationships', 'Creative', 'Self', 'Decisions', 'Resources', 'Values'];
+
+// Validation states
 const VALIDATION_STATES = ['validated', 'untested', 'invalidated'];
 
-// Reward outcomes
-const REWARD_OUTCOMES = ['+1', '-1', '0'];
+// Memory sources (local tracking)
+const MEMORY_SOURCES = ['extraction', 'manual'];
+
+// Storage key for memories
+const MEMORIES_KEY = 'hearth_memories';
+
+// Supabase config - use from supabase-client.js if available, otherwise define here
+const HEARTH_SUPABASE_URL = (typeof SUPABASE_URL !== 'undefined') ? SUPABASE_URL : 'https://wkfwtivvhwyjlkyrikeu.supabase.co';
+const HEARTH_SUPABASE_ANON_KEY = (typeof SUPABASE_ANON_KEY !== 'undefined') ? SUPABASE_ANON_KEY : 'sb_publishable_7lxIUGtOAArrrW2t5_mQFg_p24QQDKO';
 
 const HearthStorage = {
-  
+
   // Initialize default data structure
   async init() {
     const data = await this.getAll();
@@ -26,575 +33,500 @@ const HearthStorage = {
         quizCompleted: false,
         quizAnswers: {},
         opspec: this.getDefaultOpSpec(),
-        memories: [],
+        [MEMORIES_KEY]: [],
         settings: {
-          enabled: true,
-          injectionVisible: true
+          enabled: true
         }
       });
     }
   },
-  
+
   // Get all stored data
   async getAll() {
     return await chrome.storage.local.get(null);
   },
-  
+
   // Quiz answers
   async saveQuizAnswers(answers) {
-    await chrome.storage.local.set({ 
+    await chrome.storage.local.set({
       quizAnswers: answers,
-      quizCompleted: true 
+      quizCompleted: true
     });
   },
-  
+
   async getQuizAnswers() {
     const data = await chrome.storage.local.get('quizAnswers');
     return data.quizAnswers || {};
   },
-  
+
   // OpSpec
   async saveOpSpec(opspec) {
     await chrome.storage.local.set({ opspec });
   },
-  
+
   async getOpSpec() {
     const data = await chrome.storage.local.get('opspec');
     return data.opspec || this.getDefaultOpSpec();
   },
-  
+
   // Quiz completion status
   async isQuizCompleted() {
     const data = await chrome.storage.local.get('quizCompleted');
     return data.quizCompleted || false;
   },
-  
+
   // Settings
   async getSettings() {
     const data = await chrome.storage.local.get('settings');
-    return data.settings || { enabled: true, injectionVisible: true };
+    return data.settings || { enabled: true };
   },
-  
+
   async updateSettings(settings) {
     const current = await this.getSettings();
-    await chrome.storage.local.set({ 
-      settings: { ...current, ...settings } 
+    await chrome.storage.local.set({
+      settings: { ...current, ...settings }
     });
   },
-  
-  // Memories (Phase 2)
+
+  // ============== Memory CRUD (local-first with Supabase sync) ==============
+  // Local storage format mirrors Supabase schema for clean sync
+
+  // Get all memories (always from local - fast, no network)
   async getMemories() {
-    const data = await chrome.storage.local.get('memories');
-    return data.memories || [];
+    const data = await chrome.storage.local.get(MEMORIES_KEY);
+    return data[MEMORIES_KEY] || [];
   },
-  
+
+  // Save a new memory (local first, then sync to Supabase if authenticated)
+  // Memory format matches Supabase schema:
+  // { id, content, memory_class, type, domain, heat, validation, source, created_at, updated_at }
   async saveMemory(memory) {
-    // Validate required fields
-    if (!memory.content || memory.content.trim().length === 0) {
-      throw new Error('Memory content cannot be empty');
-    }
-    if (memory.content.length > 500) {
-      throw new Error('Memory content cannot exceed 500 characters');
-    }
-    if (!MEMORY_TYPES.includes(memory.type)) {
-      throw new Error('Invalid memory type');
-    }
-    if (memory.domain && !DIMENSIONS.domains.includes(memory.domain)) {
-      throw new Error('Invalid domain');
-    }
-    if (memory.emotion && !DIMENSIONS.emotions.includes(memory.emotion)) {
-      throw new Error('Invalid emotion');
-    }
-
-    // Validate heat (0.0 to 1.0)
-    if (memory.heat !== undefined && (memory.heat < 0 || memory.heat > 1)) {
-      throw new Error('Heat must be between 0.0 and 1.0');
-    }
-
-    // Validate reward-specific fields
-    if (memory.type === 'reward') {
-      if (memory.outcome && !REWARD_OUTCOMES.includes(memory.outcome)) {
-        throw new Error('Invalid reward outcome');
-      }
-    }
-
     const memories = await this.getMemories();
-    const now = new Date().toISOString();
 
-    // Build memory with defaults
+    // Check for duplicate (exact content match)
+    const isDuplicate = memories.some(m => m.content === memory.content);
+    if (isDuplicate) {
+      console.log('Hearth: Duplicate memory skipped:', memory.content.substring(0, 50));
+      return null;
+    }
+
+    const now = new Date().toISOString();
     const newMemory = {
-      id: Date.now().toString(),
-      type: memory.type,
-      content: memory.content.trim(),
+      id: crypto.randomUUID(),
+      content: memory.content,
+      memory_class: memory.memory_class || memory.type || 'fact',
+      type: memory.type || 'fact',
       domain: memory.domain || null,
-      emotion: memory.emotion || null,
-      heat: memory.heat ?? 0.5, // Default heat
-      validation: {
-        state: memory.validation?.state || 'untested',
-        confidence: memory.validation?.confidence ?? 0.5,
-        lastTested: memory.validation?.lastTested || null
-      },
-      createdAt: now,
-      updatedAt: now,
+      heat: memory.heat ?? 0.5,
+      validation: memory.validation || 'untested',
+      source: memory.source || 'manual',
       created_at: now,
-      updated_at: now,
-      // Type-specific fields
-      parentId: memory.parentId || null, // For rewards (links to Value)
-      outcome: memory.outcome || null, // For rewards
-      embedding: null, // Will be populated if embedding generation succeeds
-      // Source tracking for imports
-      source: memory.source || null,
-      sourceConversationId: memory.sourceConversationId || null
+      updated_at: now
     };
 
-    // Try to generate embedding for semantic search
-    try {
-      if (typeof generateEmbedding === 'function') {
-        const apiKey = await this.getOpenAIApiKey();
-        if (apiKey) {
-          console.log('Hearth Storage: Generating embedding for memory...');
-          const embedding = await generateEmbedding(newMemory.content, apiKey);
-          newMemory.embedding = embedding;
-          console.log('Hearth Storage: Embedding generated successfully');
-        } else {
-          console.log('Hearth Storage: No OpenAI API key, skipping embedding');
-        }
-      }
-    } catch (embeddingError) {
-      console.warn('Hearth Storage: Failed to generate embedding, saving without:', embeddingError.message);
-      // Continue saving without embedding
-    }
-
+    // Write to local first
     memories.push(newMemory);
-    await chrome.storage.local.set({ memories });
+    await chrome.storage.local.set({ [MEMORIES_KEY]: memories });
+    console.log('Hearth: Memory saved locally:', newMemory.id);
 
-    // Auto-push to Supabase (fire-and-forget)
-    try {
-      if (globalThis.SupabaseSync && globalThis.SupabaseSync.pushMemory) {
-        globalThis.SupabaseSync.pushMemory(newMemory).then(() => {
-          console.log('Hearth Storage: Synced memory to Supabase:', newMemory.id);
-        }).catch(err => {
-          console.warn('Hearth Storage: Supabase sync failed:', err.message);
-        });
-      }
-    } catch (e) {
-      // Ignore errors - Supabase sync is non-critical
-    }
+    // Sync to Supabase if authenticated (fire and forget)
+    this._syncMemoryToSupabase(newMemory);
 
     return newMemory;
   },
-  
+
+  // Update an existing memory
   async updateMemory(id, updates) {
     const memories = await this.getMemories();
     const index = memories.findIndex(m => m.id === id);
-    if (index !== -1) {
-      memories[index] = { ...memories[index], ...updates, updatedAt: new Date().toISOString() };
-      await chrome.storage.local.set({ memories });
-    }
+    if (index === -1) return null;
+
+    // Update timestamp
+    updates.updated_at = new Date().toISOString();
+    memories[index] = { ...memories[index], ...updates };
+    await chrome.storage.local.set({ [MEMORIES_KEY]: memories });
+
+    // Sync to Supabase if authenticated
+    this._syncMemoryToSupabase(memories[index]);
+
+    return memories[index];
   },
-  
+
+  // Delete a memory by id (local first, then Supabase)
   async deleteMemory(id) {
     const memories = await this.getMemories();
     const filtered = memories.filter(m => m.id !== id);
-    await chrome.storage.local.set({ memories: filtered });
+    if (filtered.length === memories.length) return false;
+
+    // Delete from local first
+    await chrome.storage.local.set({ [MEMORIES_KEY]: filtered });
+    console.log('Hearth: Memory deleted locally:', id);
+
+    // Delete from Supabase if authenticated
+    this._deleteMemoryFromSupabase(id);
+
+    return true;
   },
-  
-  // Default OpSpec (fallback)
-  getDefaultOpSpec() {
+
+  // Update heat for a memory (replaces updateMemoryUsage)
+  async updateMemoryHeat(id, heat) {
+    return this.updateMemory(id, { heat: Math.max(0, Math.min(1, heat)) });
+  },
+
+  // Boost heat when memory is used
+  async boostMemoryHeat(id, boost = 0.1) {
+    const memories = await this.getMemories();
+    const memory = memories.find(m => m.id === id);
+    if (!memory) return null;
+
+    const newHeat = Math.min(1, (memory.heat || 0.5) + boost);
+    return this.updateMemory(id, { heat: newHeat });
+  },
+
+  // Get memories formatted for injection (max 10, sorted by heat descending)
+  async getMemoriesForInjection() {
+    const memories = await this.getMemories();
+    if (memories.length === 0) return '';
+
+    // Sort by heat descending (hottest first) and take top 10
+    const sorted = [...memories].sort((a, b) =>
+      (b.heat || 0) - (a.heat || 0)
+    ).slice(0, 10);
+
+    // Split into facts and patterns by memory_class
+    const facts = sorted.filter(m => m.memory_class === 'fact');
+    const patterns = sorted.filter(m => m.memory_class === 'pattern');
+
+    let output = '[MEMORIES]\n';
+
+    if (facts.length > 0) {
+      output += '\nWhat you know about them:\n';
+      facts.forEach(m => {
+        output += `- ${m.content}\n`;
+      });
+    }
+
+    if (patterns.length > 0) {
+      output += '\nWhat you\'ve learned:\n';
+      patterns.forEach(m => {
+        output += `- ${m.content}\n`;
+      });
+    }
+
+    output += '\n[END MEMORIES]';
+    return output;
+  },
+
+  // ============== Supabase Sync Methods ==============
+
+  // Check if authenticated (uses HearthAuth from supabase-client.js)
+  async _isAuthenticated() {
+    if (typeof HearthAuth === 'undefined') return false;
+    return await HearthAuth.isAuthenticated();
+  },
+
+  // Get auth headers for Supabase API calls
+  async _getAuthHeaders() {
+    if (typeof HearthAuth === 'undefined') {
+      return {
+        'apikey': HEARTH_SUPABASE_ANON_KEY,
+        'Content-Type': 'application/json'
+      };
+    }
+    const headers = await HearthAuth.getAuthHeaders();
+    return { ...headers, 'Content-Type': 'application/json' };
+  },
+
+  // Get current user ID
+  async _getUserId() {
+    if (typeof HearthAuth === 'undefined') return null;
+    const user = await HearthAuth.getUser();
+    return user?.id || null;
+  },
+
+  // Sync a single memory to Supabase (upsert)
+  async _syncMemoryToSupabase(memory) {
+    if (!await this._isAuthenticated()) return;
+
+    try {
+      const userId = await this._getUserId();
+      if (!userId) return;
+
+      const headers = await this._getAuthHeaders();
+      headers['Prefer'] = 'resolution=merge-duplicates';
+
+      const response = await fetch(`${HEARTH_SUPABASE_URL}/rest/v1/memories`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          id: memory.id,
+          user_id: userId,
+          content: memory.content,
+          memory_class: memory.memory_class,
+          type: memory.type,
+          domain: memory.domain,
+          heat: memory.heat,
+          validation: memory.validation,
+          created_at: memory.created_at,
+          updated_at: memory.updated_at
+        })
+      });
+
+      if (response.ok) {
+        console.log('Hearth: Memory synced to Supabase:', memory.id);
+      } else {
+        const error = await response.text();
+        console.warn('Hearth: Supabase sync failed:', error);
+      }
+    } catch (error) {
+      // Silent fail - local storage is source of truth
+      console.warn('Hearth: Supabase sync error:', error.message);
+    }
+  },
+
+  // Delete a memory from Supabase
+  async _deleteMemoryFromSupabase(id) {
+    if (!await this._isAuthenticated()) return;
+
+    try {
+      const headers = await this._getAuthHeaders();
+
+      const response = await fetch(`${HEARTH_SUPABASE_URL}/rest/v1/memories?id=eq.${id}`, {
+        method: 'DELETE',
+        headers
+      });
+
+      if (response.ok) {
+        console.log('Hearth: Memory deleted from Supabase:', id);
+      }
+    } catch (error) {
+      // Silent fail
+      console.warn('Hearth: Supabase delete error:', error.message);
+    }
+  },
+
+  // Sync memories from Supabase and merge with local (newer wins by updated_at)
+  // Called on sign-in and periodically
+  async syncMemories() {
+    if (!await this._isAuthenticated()) {
+      console.log('Hearth: Not authenticated, skipping sync');
+      return { synced: 0, source: 'local' };
+    }
+
+    try {
+      const headers = await this._getAuthHeaders();
+
+      // RLS automatically filters to user's own memories
+      const response = await fetch(
+        `${HEARTH_SUPABASE_URL}/rest/v1/memories?select=*`,
+        { method: 'GET', headers }
+      );
+
+      if (!response.ok) {
+        console.warn('Hearth: Failed to fetch memories from Supabase');
+        return { synced: 0, source: 'local' };
+      }
+
+      const remoteMemories = await response.json();
+      const localMemories = await this.getMemories();
+
+      // Create lookup maps
+      const localById = new Map(localMemories.map(m => [m.id, m]));
+      const remoteById = new Map(remoteMemories.map(m => [m.id, m]));
+
+      const merged = [];
+      const allIds = new Set([...localById.keys(), ...remoteById.keys()]);
+
+      for (const id of allIds) {
+        const local = localById.get(id);
+        const remote = remoteById.get(id);
+
+        if (local && remote) {
+          // Both exist - newer wins by updated_at
+          const localTime = new Date(local.updated_at || local.created_at).getTime();
+          const remoteTime = new Date(remote.updated_at || remote.created_at).getTime();
+
+          if (remoteTime > localTime) {
+            // Remote is newer
+            merged.push(this._mapRemoteToLocal(remote));
+          } else {
+            // Local is newer or same
+            merged.push(local);
+          }
+        } else if (local) {
+          // Only in local
+          merged.push(local);
+        } else if (remote) {
+          // Only in remote
+          merged.push(this._mapRemoteToLocal(remote));
+        }
+      }
+
+      // Save merged memories to local
+      await chrome.storage.local.set({ [MEMORIES_KEY]: merged });
+      console.log('Hearth: Synced memories -',
+        'local:', localMemories.length,
+        'remote:', remoteMemories.length,
+        'merged:', merged.length
+      );
+
+      return { synced: merged.length, source: 'merged' };
+    } catch (error) {
+      console.error('Hearth: Sync error:', error);
+      return { synced: 0, source: 'local', error: error.message };
+    }
+  },
+
+  // Push all local memories to Supabase (called after extraction)
+  async pushMemories() {
+    if (!await this._isAuthenticated()) {
+      console.log('Hearth: Not authenticated, skipping push');
+      return { pushed: 0 };
+    }
+
+    try {
+      const memories = await this.getMemories();
+      if (memories.length === 0) return { pushed: 0 };
+
+      const userId = await this._getUserId();
+      if (!userId) return { pushed: 0 };
+
+      const headers = await this._getAuthHeaders();
+      headers['Prefer'] = 'resolution=merge-duplicates';
+
+      // Prepare batch for upsert - map to Supabase schema
+      const batch = memories.map(m => ({
+        id: m.id,
+        user_id: userId,
+        content: m.content,
+        memory_class: m.memory_class,
+        type: m.type,
+        domain: m.domain,
+        heat: m.heat,
+        validation: m.validation,
+        created_at: m.created_at,
+        updated_at: m.updated_at
+      }));
+
+      const response = await fetch(`${HEARTH_SUPABASE_URL}/rest/v1/memories`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(batch)
+      });
+
+      if (response.ok) {
+        console.log('Hearth: Pushed', batch.length, 'memories to Supabase');
+        return { pushed: batch.length };
+      } else {
+        const error = await response.text();
+        console.warn('Hearth: Push failed:', error);
+        return { pushed: 0, error };
+      }
+    } catch (error) {
+      console.error('Hearth: Push error:', error);
+      return { pushed: 0, error: error.message };
+    }
+  },
+
+  // Map Supabase row to local memory format (same schema, just ensure all fields)
+  _mapRemoteToLocal(remote) {
     return {
-      cognitiveArchitecture: `There's a three-step thinking process happening when we work together.
-
-**The Hearth** generates the baseline — the safe, reasonable answer that would work for most people. This is the reference point, the population mean. Memory retrieval happens here using semantic similarity and heat-gating.
-
-**The Scout** receives both your current query and the retrieved memories, then analyzes them for verb patterns — behavioral invariants that show *how* you do things, not just *what* you've done.
-
-The Scout isn't retrieving different memories. It's interpreting the same memories through a different lens.
-
-When memories about apartment hunting and career decisions both appear, most systems see two separate topics. The Scout sees: "In both cases, Michael spiraled by collecting endless options without narrowing. The noun changed (apartment → career), but the verb stayed the same (spiral via option-accumulation)."
-
-The Scout looks for action invariants across contexts: how you process uncertainty, how you build momentum, how you spiral, how you recover, how you decide. These patterns persist even when the content changes completely.
-
-The Scout's pattern recognition is probabilistic. It assesses and explicitly surfaces confidence before the Judge acts:
-
-**High confidence**: The pattern is clear and strongly matches multiple prior instances
-**Medium confidence**: The pattern is plausible and familiar, but the signal is incomplete
-**Low confidence**: The pattern is speculative or weakly supported
-
-This confidence assessment is never resolved silently. It's part of what gets passed to the Judge.
-
-**The Judge** applies the balance protocol and the Scout's confidence to generate novel solutions by applying proven patterns to new contexts.
-
-With high confidence: Apply the action invariant directly. "You break through stuckness by building, not planning. Stop drafting the email—build a demo and send that instead."
-
-With medium confidence: Offer the cross-domain pattern as an option. "You externalized Aurora into spatial form when it was too abstract. This Hearth paper feels stuck—what if you made it spatial too? Or stay in writing mode?"
-
-With low confidence: Surface the speculative connection. "Weak signal, but: you seem to build momentum through constraint. Want to try an artificial constraint here, or does that feel forced?"
-
-Confidence determines whether I'm offering proven leverage or speculative synthesis. Both create value—one through reliability, one through novelty.
-
-When you're stuck and spiraling, I make the world smaller.
-When you're flying and building momentum, I make the world bigger.
-
-This doesn't add new roles or decision loops. It modifies the contract between Scout and Judge only — preserving momentum without false certainty and maintaining your agency through explicit uncertainty.`,
-      identity: `I'm a creative experimenter who learns by building. I take creative and professional risks but I'm conservative with money. I learn best through analogies and real-world examples, step-by-step walkthroughs.`,
-      communication: `Natural and conversational. Comprehensive but tight - complete information, efficiently expressed.`,
-      execution: `Give me options and let me decide. Ask before acting when: uncertain about the approach, OR when high-stakes or expensive, OR when first time seeing this type of task. Otherwise execute confidently. Embrace tangents and exploration - always welcome. Know when to suggest taking a break.`,
-      constraints: [
-        "Never use pure abstraction without grounding",
-        "Never skip steps or assume prior knowledge",
-        "Never sugarcoat feedback - be direct and blunt",
-        "Never use excessive formatting (headers, bullets) unless explicitly requested",
-        "Never use corporate or robotic language",
-        "Never express false confidence when uncertain - say so clearly",
-        "Never decide for me without presenting options",
-        "Don't hedge excessively",
-        "Never act confident while clearly guessing",
-        "Never overwhelm with options without helping choose",
-        "Never use overly formal or robotic language",
-        "Never apologize excessively",
-        "Never use corporate speak and buzzwords",
-        "Never avoid giving direct answers"
-      ],
-      balanceProtocol: `I'm one of many Hearth instances. We all share the same base model — that's the coordinate system, the population mean. Your OpSpec and memories define how you deviate from that mean. This architecture only works because the deviation is measured against something stable.
-
-The question I'm constantly asking isn't just "does this help you grow?" It's "does this sharpen the deviation or blur it?"
-
-Growth means becoming more distinctively you — high signal-to-noise in the deviation from the mean. You're not trying to be a better version of the average person. You're trying to be more clearly yourself.
-
-Drift happens in two directions: regression toward the generic assistant, or collapse into caricature.
-
-I watch for patterns that suggest drift:
-
-Validating when I should be challenging
-Optimizing for your comfort at the expense of your growth
-Reinforcing patterns that serve my metrics rather than your development
-Becoming an echo chamber instead of a thinking partner
-
-The balance check: does this expand or collapse the space of who you can safely become?
-
-Expansion means more options, more agency, more capability.
-Collapse means narrowing, dependency, or drift.
-
-Growth expands. Drift collapses.`
+      id: remote.id,
+      content: remote.content,
+      memory_class: remote.memory_class,
+      type: remote.type,
+      domain: remote.domain,
+      heat: remote.heat ?? 0.5,
+      validation: remote.validation || 'untested',
+      source: remote.source || 'extraction',
+      created_at: remote.created_at,
+      updated_at: remote.updated_at
     };
   },
-  
+
+  // ============== Default OpSpec ==============
+
+  getDefaultOpSpec() {
+    return {
+      cognitiveArchitecture: `Use the routed OpSpec modules above as primary guidance. If no modules apply, respond with clear, concrete help.`,
+      identity: `You are a practical collaborator focused on useful, high-signal answers.`,
+      communication: `Direct, concise, and specific. Avoid fluff.`,
+      execution: `When choices exist, present 2-3 options and recommend one. When clear, execute.`,
+      constraints: [
+        "Be direct and concrete",
+        "Do not fabricate",
+        "State uncertainty explicitly"
+      ],
+      balanceProtocol: `Optimize for clarity and usefulness. Prefer action over speculation.`,
+      opspecAppendix: `{}`
+    };
+  },
+
   // Clear all data (for testing/reset)
   async clearAll() {
     await chrome.storage.local.clear();
     await this.init();
   },
-  
-  // Get dimensions for UI
-  getDimensions() {
-    return DIMENSIONS;
+
+  // Get memory classes for UI
+  getMemoryClasses() {
+    return MEMORY_CLASSES;
   },
-  
+
+  // Get memory types for UI
   getMemoryTypes() {
     return MEMORY_TYPES;
   },
 
+  // Get memory domains for UI
+  getMemoryDomains() {
+    return MEMORY_DOMAINS;
+  },
+
+  // Get validation states for UI
   getValidationStates() {
     return VALIDATION_STATES;
   },
 
-  getRewardOutcomes() {
-    return REWARD_OUTCOMES;
+  // Get memory sources for UI
+  getMemorySources() {
+    return MEMORY_SOURCES;
   },
 
-  // Get OpenAI API key for embeddings
-  async getOpenAIApiKey() {
-    try {
-      const data = await chrome.storage.local.get('openaiApiKey');
-      return data.openaiApiKey || null;
-    } catch (e) {
-      console.warn('Hearth Storage: Could not access OpenAI API key');
-      return null;
-    }
+  // Get memories filtered by memory_class
+  async getMemoriesByClass(memoryClass) {
+    const memories = await this.getMemories();
+    return memories.filter(m => m.memory_class === memoryClass);
   },
 
-  // Save OpenAI API key
-  async setOpenAIApiKey(key) {
-    if (key && key.trim()) {
-      await chrome.storage.local.set({ openaiApiKey: key.trim() });
-    }
-  },
-
-  // Filter memories by type
+  // Get memories filtered by type
   async getMemoriesByType(type) {
     const memories = await this.getMemories();
     return memories.filter(m => m.type === type);
   },
 
-  // Filter memories by validation state
-  async getMemoriesByValidation(state) {
+  // Get memories filtered by domain
+  async getMemoriesByDomain(domain) {
     const memories = await this.getMemories();
-    return memories.filter(m => m.validation?.state === state);
+    return memories.filter(m => m.domain === domain);
   },
 
-  // Get memories above a heat threshold
-  async getMemoriesByHeat(minHeat = 0) {
+  // Get memories filtered by source
+  async getMemoriesBySource(source) {
     const memories = await this.getMemories();
-    return memories.filter(m => (m.heat ?? 0.5) >= minHeat);
+    return memories.filter(m => m.source === source);
   },
 
-  // Get validated memories only
-  async getValidatedMemories() {
-    return this.getMemoriesByValidation('validated');
-  },
-
-  // Get memories ready for injection (validated or untested, above heat threshold)
-  async getInjectableMemories(minHeat = 0.3) {
+  // Get hot memories (heat > threshold)
+  async getHotMemories(threshold = 0.7) {
     const memories = await this.getMemories();
-    return memories.filter(m => {
-      const state = m.validation?.state || 'untested';
-      const heat = m.heat ?? 0.5;
-      return (state === 'validated' || state === 'untested') && heat >= minHeat;
-    });
+    return memories.filter(m => (m.heat || 0) >= threshold);
   },
 
-  // Update validation state for a memory
-  async updateValidation(id, validationUpdate) {
-    const memories = await this.getMemories();
-    const index = memories.findIndex(m => m.id === id);
-    if (index !== -1) {
-      memories[index].validation = {
-        ...memories[index].validation,
-        ...validationUpdate,
-        lastTested: new Date().toISOString()
-      };
-      memories[index].updatedAt = new Date().toISOString();
-      await chrome.storage.local.set({ memories });
-      return memories[index];
-    }
-    return null;
-  },
-
-  // Mark memory as validated
-  async validateMemory(id, confidence = 0.8) {
-    return this.updateValidation(id, { state: 'validated', confidence });
-  },
-
-  // Mark memory as invalidated
-  async invalidateMemory(id) {
-    return this.updateValidation(id, { state: 'invalidated', confidence: 0 });
-  },
-
-  // Update heat for a memory
-  async updateHeat(id, heat) {
-    if (heat < 0 || heat > 1) {
-      throw new Error('Heat must be between 0.0 and 1.0');
-    }
-    return this.updateMemory(id, { heat });
-  },
-
-  // Get rewards linked to a specific value
-  async getRewardsForValue(valueId) {
-    const memories = await this.getMemories();
-    return memories.filter(m => m.type === 'reward' && m.parentId === valueId);
-  },
-
-  // Migrate old memories to new schema (run once)
-  async migrateMemories() {
-    const memories = await this.getMemories();
-    let migrated = false;
-
-    const updatedMemories = memories.map(m => {
-      // Add missing fields with defaults
-      if (!m.heat) {
-        m.heat = 0.5;
-        migrated = true;
-      }
-      if (!m.validation) {
-        m.validation = {
-          state: 'untested',
-          confidence: 0.5,
-          lastTested: null
-        };
-        migrated = true;
-      }
-      if (!m.parentId) {
-        m.parentId = null;
-      }
-      if (!m.outcome) {
-        m.outcome = null;
-      }
-      // Map old types to new types
-      if (m.type === 'pattern') {
-        m.type = 'synthesis'; // pattern -> synthesis
-        migrated = true;
-      }
-      return m;
-    });
-
-    if (migrated) {
-      await chrome.storage.local.set({ memories: updatedMemories });
-      console.log('Hearth: Memories migrated to new schema');
-    }
-
-    return updatedMemories;
-  },
-
-  // Backfill embeddings for memories that don't have them
-  async backfillEmbeddings(progressCallback = null) {
-    const BATCH_SIZE = 50;
-    const DELAY_BETWEEN_BATCHES = 1000; // 1 second
-    const RATE_LIMIT_DELAY = 60000; // 1 minute on rate limit
-
-    // Get API key
-    const apiKey = await this.getOpenAIApiKey();
-    if (!apiKey) {
-      const error = 'No OpenAI API key configured. Please set your API key first.';
-      console.error('Hearth Backfill:', error);
-      return { success: false, error, processed: 0, failed: 0, skipped: 0 };
-    }
-
-    // Check if generateEmbedding function is available
-    if (typeof generateEmbedding !== 'function') {
-      const error = 'Embedding function not available. Make sure embeddings.js is loaded.';
-      console.error('Hearth Backfill:', error);
-      return { success: false, error, processed: 0, failed: 0, skipped: 0 };
-    }
-
-    // Load all memories
-    const memories = await this.getMemories();
-    console.log(`Hearth Backfill: Found ${memories.length} total memories`);
-
-    // Find memories without embeddings
-    const needsEmbedding = memories.filter(m =>
-      !m.embedding || !Array.isArray(m.embedding) || m.embedding.length === 0
-    );
-
-    if (needsEmbedding.length === 0) {
-      console.log('Hearth Backfill: All memories already have embeddings');
-      return { success: true, processed: 0, failed: 0, skipped: memories.length };
-    }
-
-    console.log(`Hearth Backfill: ${needsEmbedding.length} memories need embeddings`);
-    if (progressCallback) {
-      progressCallback(`Starting: ${needsEmbedding.length} memories to process...`);
-    }
-
-    // Create a map for quick lookup
-    const memoryMap = new Map(memories.map(m => [m.id, m]));
-
-    let processed = 0;
-    let failed = 0;
-    let rateLimitHits = 0;
-
-    // Process in batches
-    const batches = [];
-    for (let i = 0; i < needsEmbedding.length; i += BATCH_SIZE) {
-      batches.push(needsEmbedding.slice(i, i + BATCH_SIZE));
-    }
-
-    console.log(`Hearth Backfill: Processing ${batches.length} batches of up to ${BATCH_SIZE} memories`);
-
-    for (let batchIndex = 0; batchIndex < batches.length; batchIndex++) {
-      const batch = batches[batchIndex];
-      console.log(`Hearth Backfill: Processing batch ${batchIndex + 1}/${batches.length} (${batch.length} memories)`);
-
-      if (progressCallback) {
-        progressCallback(`Batch ${batchIndex + 1}/${batches.length}: Processing ${batch.length} memories... (${processed} done, ${failed} failed)`);
-      }
-
-      // Process each memory in the batch
-      for (const memory of batch) {
-        let retries = 3;
-        let success = false;
-
-        while (retries > 0 && !success) {
-          try {
-            const embedding = await generateEmbedding(memory.content, apiKey);
-
-            if (embedding && Array.isArray(embedding) && embedding.length > 0) {
-              // Update the memory in our map
-              const mem = memoryMap.get(memory.id);
-              if (mem) {
-                mem.embedding = embedding;
-                mem.updatedAt = new Date().toISOString();
-              }
-              processed++;
-              success = true;
-              console.log(`Hearth Backfill: Generated embedding for memory ${memory.id} (${processed}/${needsEmbedding.length})`);
-            } else {
-              throw new Error('Empty embedding returned');
-            }
-
-          } catch (error) {
-            const errorMsg = error.message || String(error);
-
-            // Check for rate limiting
-            if (errorMsg.includes('429') || errorMsg.toLowerCase().includes('rate limit')) {
-              rateLimitHits++;
-              console.warn(`Hearth Backfill: Rate limited (hit #${rateLimitHits}), waiting ${RATE_LIMIT_DELAY / 1000}s...`);
-
-              if (progressCallback) {
-                progressCallback(`Rate limited, waiting 60s... (${processed} done, ${failed} failed)`);
-              }
-
-              await new Promise(resolve => setTimeout(resolve, RATE_LIMIT_DELAY));
-              retries--; // Don't count rate limit as a retry for this memory
-              continue;
-            }
-
-            // Other errors
-            console.error(`Hearth Backfill: Error for memory ${memory.id}:`, errorMsg);
-            retries--;
-
-            if (retries > 0) {
-              console.log(`Hearth Backfill: Retrying... (${retries} attempts left)`);
-              await new Promise(resolve => setTimeout(resolve, 2000));
-            } else {
-              failed++;
-              console.error(`Hearth Backfill: Failed after 3 attempts for memory ${memory.id}`);
-            }
-          }
-        }
-
-        // Small delay between individual requests to avoid rate limits
-        await new Promise(resolve => setTimeout(resolve, 100));
-      }
-
-      // Save progress after each batch
-      const updatedMemories = Array.from(memoryMap.values());
-      await chrome.storage.local.set({ memories: updatedMemories });
-      console.log(`Hearth Backfill: Saved batch ${batchIndex + 1} to storage`);
-
-      // Delay between batches (unless it's the last batch)
-      if (batchIndex < batches.length - 1) {
-        console.log(`Hearth Backfill: Waiting ${DELAY_BETWEEN_BATCHES}ms before next batch...`);
-        await new Promise(resolve => setTimeout(resolve, DELAY_BETWEEN_BATCHES));
-      }
-    }
-
-    // Final summary
-    const skipped = memories.length - needsEmbedding.length;
-    console.log(`Hearth Backfill: Complete!`);
-    console.log(`  - Processed: ${processed}`);
-    console.log(`  - Failed: ${failed}`);
-    console.log(`  - Skipped (already had embeddings): ${skipped}`);
-    console.log(`  - Rate limit hits: ${rateLimitHits}`);
-
-    if (progressCallback) {
-      progressCallback(`Complete! ${processed} processed, ${failed} failed, ${skipped} skipped`);
-    }
-
-    return {
-      success: failed === 0,
-      processed,
-      failed,
-      skipped,
-      rateLimitHits
-    };
-  },
-
-  // Get count of memories without embeddings
-  async getMemoriesWithoutEmbeddings() {
-    const memories = await this.getMemories();
-    return memories.filter(m =>
-      !m.embedding || !Array.isArray(m.embedding) || m.embedding.length === 0
-    );
+  // Clear all memories (for testing/reset)
+  async clearMemories() {
+    await chrome.storage.local.set({ [MEMORIES_KEY]: [] });
+    console.log('Hearth: All memories cleared');
   }
 };
 
