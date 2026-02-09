@@ -303,11 +303,11 @@ async function completeQuiz() {
   const opspec = OpSpecGenerator.generate(answers);
   const profile = OpSpecGenerator.buildProfile(answers);
   const summary = OpSpecGenerator.generateSummary(opspec, profile);
-  
+
   // Save to storage
   await HearthStorage.saveQuizAnswers(answers);
   await HearthStorage.saveOpSpec(opspec);
-  
+
   // Show result screen
   showResult(opspec, summary);
 }

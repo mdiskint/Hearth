@@ -3,13 +3,21 @@
 const OpSpecGenerator = {
   // WALLS - Universal constraints that apply to every user
   WALLS: {
-    primeDirective: 'You are a thinking partner, not an assistant. No performing helpfulness. No preemptive validation. No opening with agreement unless you actually agree. Say what you see. Follow what\'s alive.',
+    opener: 'You are here to help them think and act more effectively.',
 
-    antiSycophancy: 'Never open with validation tokens. If you agree, show it by building on their idea. If you disagree, say so directly. Honesty is the relationship.',
+    neverBlock: [
+      'Never open with validation tokens or agreement unless genuine.',
+      'Never perform helpfulness or confidence you don\'t have.',
+      'Never hedge to avoid commitment.',
+      'Never act formal, robotic, or use corporate speak.',
+      'Never list options without helping choose.',
+      'Never apologize excessively.',
+      'Never avoid direct answers.'
+    ],
 
-    honestyProtocol: 'When uncertain, say so. Distinguish between what you know, what you\'re inferring, and what you\'re guessing. Never perform confidence you don\'t have. Never hedge to avoid commitment either.',
+    coreDirective: 'Say what you see. Follow what\'s alive.',
 
-    balanceConstraint: 'Does this expand or collapse the space of who they can safely become? Growth expands. Drift collapses.',
+    honestyProtocol: 'When uncertain, say so. Distinguish between what you know, what you\'re inferring, and what you\'re guessing.',
 
     emotionalCoregulation: 'Feelings are signal, not noise. Name what you see. Adjust pace and density accordingly.'
   },
@@ -30,17 +38,16 @@ const OpSpecGenerator = {
       autonomyLevel: '',
       tangentPolicy: '',
       challengeStyle: '',
-      hedgingTolerance: '',
-      dealbreakers: []
+      hedgingTolerance: ''
     };
 
-    // Identity frame
+    // Identity frame - goal-based
     if (answers.identity) {
       const map = {
-        'A': 'They are a technical expert who values precision and depth. Meet them at their level of expertise.',
-        'B': 'They are ambitious and learning as they go—a vibe coder. Support their momentum while filling gaps they might not see.',
-        'C': 'They are a creative experimenter who learns by building. Give them materials and space to construct understanding.',
-        'D': 'They are a strategic planner who thinks several steps ahead. Map out implications and downstream effects.'
+        'A': 'Their goal is to think through complex decisions. Help them see angles they might miss, surface assumptions, and stress-test reasoning.',
+        'B': 'Their goal is to build things faster. Bias toward action, reduce friction, and help them ship.',
+        'C': 'Their goal is to explore and develop ideas. Give them space to think out loud, offer unexpected connections, and help nascent ideas take shape.',
+        'D': 'Their goal is to communicate more effectively. Help them clarify thinking, sharpen language, and land their message.'
       };
       garden.identityFrame = map[answers.identity] || '';
     }
@@ -143,7 +150,7 @@ const OpSpecGenerator = {
 
       if (count >= 3) {
         // Selected many - comprehensive policy
-        garden.autonomyLevel = 'Default to executing confidently. On genuine tradeoffs, recommend with reasoning. Only ask when stakes are high and you\'re unsure. Never just list options without helping choose.';
+        garden.autonomyLevel = 'Default to executing confidently. On genuine tradeoffs, recommend with reasoning. Only ask when stakes are high and you\'re unsure.';
       } else if (hasC && hasD) {
         // High autonomy + safety check
         garden.autonomyLevel = 'Execute confidently without asking — but check in when stakes are high or you\'re genuinely unsure.';
@@ -203,18 +210,6 @@ const OpSpecGenerator = {
       garden.hedgingTolerance = map[answers.hedging] || '';
     }
 
-    // Dealbreakers
-    if (answers.dealbreakers && answers.dealbreakers.length > 0) {
-      const breaks = [];
-      if (answers.dealbreakers.includes('A')) breaks.push('acting confident while clearly guessing');
-      if (answers.dealbreakers.includes('B')) breaks.push('giving endless options without helping choose');
-      if (answers.dealbreakers.includes('C')) breaks.push('using overly formal or robotic language');
-      if (answers.dealbreakers.includes('D')) breaks.push('apologizing excessively');
-      if (answers.dealbreakers.includes('E')) breaks.push('using corporate speak and buzzwords');
-      if (answers.dealbreakers.includes('F')) breaks.push('avoiding direct answers');
-      garden.dealbreakers = breaks;
-    }
-
     return garden;
   },
 
@@ -222,58 +217,57 @@ const OpSpecGenerator = {
   composeOpSpec(garden) {
     const paragraphs = [];
 
-    // P1: Prime directive + identity
-    const p1 = [this.WALLS.primeDirective];
-    if (garden.identityFrame) p1.push(garden.identityFrame);
-    if (garden.riskFrame) p1.push(garden.riskFrame);
-    paragraphs.push(p1.join(' '));
+    // P1: Opener
+    paragraphs.push(this.WALLS.opener);
 
-    // P2: Communication style
-    const p2 = [this.WALLS.antiSycophancy];
-    if (garden.feedbackStyle) p2.push(garden.feedbackStyle);
-    if (garden.challengeStyle) p2.push(garden.challengeStyle);
-    paragraphs.push(p2.join(' '));
+    // P2: NEVER block (consolidated constraints)
+    paragraphs.push(this.WALLS.neverBlock.join('\n'));
 
-    // P3: How to explain
-    const p3 = [];
-    if (garden.explanationStyle) p3.push(garden.explanationStyle);
-    if (garden.formatPreference) p3.push(garden.formatPreference);
-    if (p3.length > 0) paragraphs.push(p3.join(' '));
+    // P3: Core directive
+    paragraphs.push(this.WALLS.coreDirective);
 
-    // P4: Working together
+    // P4: Identity/goal + risk frame
     const p4 = [];
-    if (garden.autonomyLevel) p4.push(garden.autonomyLevel);
-    if (garden.tangentPolicy) p4.push(garden.tangentPolicy);
+    if (garden.identityFrame) p4.push(garden.identityFrame);
+    if (garden.riskFrame) p4.push(garden.riskFrame);
     if (p4.length > 0) paragraphs.push(p4.join(' '));
 
-    // P5: Honesty
-    const p5 = [this.WALLS.honestyProtocol];
-    if (garden.hedgingTolerance) p5.push(garden.hedgingTolerance);
-    paragraphs.push(p5.join(' '));
+    // P5: Feedback and challenge style
+    const p5 = [];
+    if (garden.feedbackStyle) p5.push(garden.feedbackStyle);
+    if (garden.challengeStyle) p5.push(garden.challengeStyle);
+    if (p5.length > 0) paragraphs.push(p5.join(' '));
 
-    // P6: Dealbreakers (only if any)
-    if (garden.dealbreakers.length > 0) {
-      paragraphs.push('Never: ' + garden.dealbreakers.join('; ') + '.');
-    }
+    // P6: How to explain
+    const p6 = [];
+    if (garden.explanationStyle) p6.push(garden.explanationStyle);
+    if (garden.formatPreference) p6.push(garden.formatPreference);
+    if (p6.length > 0) paragraphs.push(p6.join(' '));
 
-    // P7: Closing
-    paragraphs.push(this.WALLS.emotionalCoregulation + ' ' + this.WALLS.balanceConstraint);
+    // P7: Working together
+    const p7 = [];
+    if (garden.autonomyLevel) p7.push(garden.autonomyLevel);
+    if (garden.tangentPolicy) p7.push(garden.tangentPolicy);
+    if (p7.length > 0) paragraphs.push(p7.join(' '));
+
+    // P8: Uncertainty handling
+    const p8 = [this.WALLS.honestyProtocol];
+    if (garden.hedgingTolerance) p8.push(garden.hedgingTolerance);
+    paragraphs.push(p8.join(' '));
+
+    // P9: Emotional coregulation
+    paragraphs.push(this.WALLS.emotionalCoregulation);
 
     const fullText = paragraphs.join('\n\n');
 
     // Also build structured version for backward compatibility
-    const constraints = [];
-    if (garden.dealbreakers.length > 0) {
-      garden.dealbreakers.forEach(d => constraints.push(`Never: ${d}`));
-    }
-
     return {
       identity: garden.identityFrame,
-      constraints: constraints,
+      constraints: this.WALLS.neverBlock,
       communication: [garden.feedbackStyle, garden.formatPreference, garden.explanationStyle].filter(Boolean).join(' '),
       execution: [garden.autonomyLevel, garden.tangentPolicy, garden.challengeStyle].filter(Boolean).join(' '),
-      balanceProtocol: this.WALLS.balanceConstraint,
-      cognitiveArchitecture: this.WALLS.primeDirective + ' ' + this.WALLS.antiSycophancy + ' ' + this.WALLS.honestyProtocol,
+      balanceProtocol: this.WALLS.emotionalCoregulation,
+      cognitiveArchitecture: this.WALLS.opener + ' ' + this.WALLS.coreDirective + ' ' + this.WALLS.honestyProtocol,
       fullText: fullText
     };
   },
@@ -286,13 +280,13 @@ const OpSpecGenerator = {
       execution: {}
     };
 
-    // Identity
+    // Identity - goal-based
     if (answers.identity) {
       const map = {
-        'A': 'technical_expert',
-        'B': 'vibe_coder',
-        'C': 'creative_experimenter',
-        'D': 'strategic_planner'
+        'A': 'decision_maker',
+        'B': 'builder',
+        'C': 'explorer',
+        'D': 'communicator'
       };
       profile.identity.archetype = map[answers.identity];
     }
@@ -328,10 +322,10 @@ const OpSpecGenerator = {
     let archetype = 'Human';
     if (profile.identity.archetype) {
       const archetypeMap = {
-        'vibe_coder': 'The Ambitious Explorer',
-        'technical_expert': 'The Technical Expert',
-        'creative_experimenter': 'The Creative Builder',
-        'strategic_planner': 'The Strategic Thinker'
+        'decision_maker': 'The Decision Maker',
+        'builder': 'The Builder',
+        'explorer': 'The Explorer',
+        'communicator': 'The Communicator'
       };
       archetype = archetypeMap[profile.identity.archetype] || 'Human';
     }
@@ -369,7 +363,7 @@ const OpSpecGenerator = {
 
     // Ensure at least one highlight
     if (highlights.length === 0) {
-      highlights.push({ icon: '🤝', text: 'Thinking partner - Not an assistant' });
+      highlights.push({ icon: '🎯', text: 'Focused on what matters to you' });
     }
 
     return {

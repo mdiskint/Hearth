@@ -610,6 +610,7 @@ ${narrativeSection}`;
               }
 
               // Run memory retrieval (semantic search, no heat gating)
+              // Stage 2 surprise re-ranking needs the base system prompt (OpSpec + affect, no memories)
               let memorySection = '';
               console.log('Hearth: Pre-retrieval check',
                 'initialized:', retrievalInitialized,
@@ -618,14 +619,21 @@ ${narrativeSection}`;
               );
               if (capturedUserMessage && window.HearthRetrieval) {
                 try {
+                  // Build base prompt for Stage 2 surprise scoring
+                  const baseSystemPrompt = routedOpSpec
+                    ? `${routedOpSpec}${affectSection}`.trim()
+                    : affectSection.trim();
+
                   const retrieval = await window.HearthRetrieval.retrieve(
-                    capturedUserMessage
+                    capturedUserMessage,
+                    { baseSystemPrompt }
                   );
                   console.log('Hearth: Retrieval result',
                     'injection:', !!retrieval.injection,
                     'goal:', retrieval.goal,
                     'user:', retrieval.userMemories.length,
-                    'ai:', retrieval.aiMemories.length
+                    'ai:', retrieval.aiMemories.length,
+                    'stage2:', retrieval.debug?.stage2?.applied ? `${retrieval.debug.stage2.dominantDomain} (${retrieval.debug.stage2.domainCount})` : 'skipped'
                   );
                   if (retrieval.injection) {
                     memorySection = `\n\n${retrieval.injection}`;
@@ -635,7 +643,7 @@ ${narrativeSection}`;
                 }
               }
 
-              // Pipeline order: OpSpec → affect complement → forge phase → memories → user message
+              // Pipeline order: OpSpec → Affect Complement → Forge Complement → Memories → user message
               const fullContext = routedOpSpec
                 ? `${routedOpSpec}\n\n${context}${affectSection}${forgeSection}${memorySection}`
                 : `${context}${affectSection}${forgeSection}${memorySection}`;

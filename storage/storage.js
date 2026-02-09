@@ -18,6 +18,16 @@ const MEMORY_SOURCES = ['extraction', 'manual'];
 // Storage key for memories
 const MEMORIES_KEY = 'hearth_memories';
 
+/**
+ * Invalidate the surprise cache when memories change.
+ * Sends postMessage to page context where the cache lives.
+ */
+function invalidateSurpriseCache() {
+  if (typeof window !== 'undefined') {
+    window.postMessage({ type: 'HEARTH_INVALIDATE_SURPRISE_CACHE' }, '*');
+  }
+}
+
 // Supabase config - use from supabase-client.js if available, otherwise define here
 const HEARTH_SUPABASE_URL = (typeof SUPABASE_URL !== 'undefined') ? SUPABASE_URL : 'https://wkfwtivvhwyjlkyrikeu.supabase.co';
 const HEARTH_SUPABASE_ANON_KEY = (typeof SUPABASE_ANON_KEY !== 'undefined') ? SUPABASE_ANON_KEY : 'sb_publishable_7lxIUGtOAArrrW2t5_mQFg_p24QQDKO';
@@ -132,6 +142,9 @@ const HearthStorage = {
     // Sync to Supabase if authenticated (fire and forget)
     this._syncMemoryToSupabase(newMemory);
 
+    // Invalidate surprise cache since memory pool changed
+    invalidateSurpriseCache();
+
     return newMemory;
   },
 
@@ -149,6 +162,9 @@ const HearthStorage = {
     // Sync to Supabase if authenticated
     this._syncMemoryToSupabase(memories[index]);
 
+    // Invalidate surprise cache since memory content may have changed
+    invalidateSurpriseCache();
+
     return memories[index];
   },
 
@@ -164,6 +180,9 @@ const HearthStorage = {
 
     // Delete from Supabase if authenticated
     this._deleteMemoryFromSupabase(id);
+
+    // Invalidate surprise cache since memory pool changed
+    invalidateSurpriseCache();
 
     return true;
   },

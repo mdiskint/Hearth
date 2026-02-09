@@ -343,53 +343,63 @@ const COMPLEMENTS = {
 /**
  * Generate the complementary container as an OpSpec fragment.
  *
+ * Priority selector: picks ONE instruction block based on highest-priority match.
+ * Priority order:
+ *   1. SHUTDOWN: expansion < -0.4 AND activation < -0.2
+ *   2. EXECUTION: certainty > 0.4 AND expansion > 0
+ *   3. CONTRACTED: expansion < -0.2
+ *   4. FLOWING: expansion > 0.2
+ *   5. SEEKING: certainty < -0.2
+ *   6. NEUTRAL: none of the above
+ *
  * @param {Object} shape - Output from detectAffect()
- * @returns {Object} Complement with modulations and assembled OpSpec fragment
+ * @returns {Object} Complement with modulation and assembled OpSpec fragment
  */
 function generateComplement(shape) {
   if (!shape) return { modulations: [], opspec: '' };
 
-  const modulations = [];
-  const opspecParts = [];
-
-  // Check each axis
-  for (const [axis, poles] of Object.entries(COMPLEMENTS)) {
-    const value = shape[axis];
-    if (typeof value !== 'number') continue;
-
-    for (const [pole, config] of Object.entries(poles)) {
-      const isNegativePole = config.threshold < 0;
-      const triggered = isNegativePole
-        ? value <= config.threshold
-        : value >= config.threshold;
-
-      if (triggered) {
-        modulations.push({
-          axis,
-          pole,
-          value,
-          modulation: config.modulation
-        });
-        opspecParts.push(config.opspec);
-      }
-    }
-  }
-
-  // Always output the shape reading + any modulations
   const shapeLabel = `Shape: expansion=${shape.expansion}, activation=${shape.activation}, certainty=${shape.certainty}`;
 
-  if (opspecParts.length === 0) {
-    // Neutral — no modulation, but still inject the shape for transparency
+  let selectedModulation = null;
+  let selectedOpspec = null;
+
+  // Priority 1: SHUTDOWN - deeply contracted AND frozen
+  if (shape.expansion < -0.4 && shape.activation < -0.2) {
+    selectedModulation = { axis: 'activation', pole: 'frozen', value: shape.activation, modulation: 'warming' };
+    selectedOpspec = COMPLEMENTS.activation.frozen.opspec;
+  }
+  // Priority 2: EXECUTION - high certainty AND not deeply contracted
+  else if (shape.certainty > 0.4 && shape.expansion > -0.2) {
+    selectedModulation = { axis: 'certainty', pole: 'certain', value: shape.certainty, modulation: 'executing' };
+    selectedOpspec = COMPLEMENTS.certainty.certain.opspec;
+  }
+  // Priority 3: CONTRACTED - closed/small
+  else if (shape.expansion < -0.2) {
+    selectedModulation = { axis: 'expansion', pole: 'contracted', value: shape.expansion, modulation: 'expansive' };
+    selectedOpspec = COMPLEMENTS.expansion.contracted.opspec;
+  }
+  // Priority 4: FLOWING - open and expansive
+  else if (shape.expansion > 0.2) {
+    selectedModulation = { axis: 'expansion', pole: 'expanded', value: shape.expansion, modulation: 'focusing' };
+    selectedOpspec = COMPLEMENTS.expansion.expanded.opspec;
+  }
+  // Priority 5: SEEKING - uncertain/questioning
+  else if (shape.certainty < -0.2) {
+    selectedModulation = { axis: 'certainty', pole: 'uncertain', value: shape.certainty, modulation: 'grounding' };
+    selectedOpspec = COMPLEMENTS.certainty.uncertain.opspec;
+  }
+  // Priority 6: NEUTRAL - no strong signals
+  else {
     return {
       modulations: [],
       opspec: `[AFFECT COMPLEMENT]\n${shapeLabel}\nNo active modulation — neutral container.\n[END AFFECT COMPLEMENT]`
     };
   }
 
-  const opspec = `[AFFECT COMPLEMENT]\n${shapeLabel}\n\n${opspecParts.join('\n\n')}\n[END AFFECT COMPLEMENT]`;
+  const opspec = `[AFFECT COMPLEMENT]\n${shapeLabel}\n\n${selectedOpspec}\n[END AFFECT COMPLEMENT]`;
 
   return {
-    modulations,
+    modulations: [selectedModulation],
     opspec
   };
 }

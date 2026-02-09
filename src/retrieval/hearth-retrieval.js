@@ -332,6 +332,217 @@ async function searchPool(embedding, pool, cutoffDate) {
 }
 
 // ============================================================
+// Step 5b: Detect Dominant Domain (Stage 2 trigger)
+// ============================================================
+
+/**
+ * Detect if retrieval results are dominated by a single domain.
+ * Used to trigger Stage 2 surprise re-ranking — we only do the expensive
+ * re-rank when results cluster in one domain, because that's where
+ * cosine similarity can't differentiate.
+ *
+ * @param {Array} memories - Array of memory objects with domain field
+ * @returns {{ isDominated: boolean, dominantDomain: string|null, count: number }}
+ */
+function detectDominantDomain(memories) {
+  if (!memories || memories.length === 0) {
+    return { isDominated: false, dominantDomain: null, count: 0 };
+  }
+
+  // Count occurrences of each domain
+  const domainCounts = new Map();
+  for (const m of memories) {
+    const domain = m.domain || 'unknown';
+    domainCounts.set(domain, (domainCounts.get(domain) || 0) + 1);
+  }
+
+  // Find the domain with the highest count
+  let maxDomain = null;
+  let maxCount = 0;
+  for (const [domain, count] of domainCounts) {
+    if (count > maxCount) {
+      maxCount = count;
+      maxDomain = domain;
+    }
+  }
+
+  // Check if dominant (more than half)
+  const threshold = memories.length / 2;
+  const isDominated = maxCount > threshold;
+
+  return {
+    isDominated,
+    dominantDomain: isDominated ? maxDomain : null,
+    count: maxCount
+  };
+}
+
+// ============================================================
+// Step 5c: Stage 2 Surprise Re-ranking
+// ============================================================
+
+/**
+ * Re-rank domain-dominated results by surprise (KL divergence).
+ * When semantic search returns clustered results from one domain,
+ * cosine similarity can't differentiate. Surprise scoring measures
+ * which memories actually change the model's predicted response.
+ *
+ * @param {Array} candidates - Memory candidates from Stage 1
+ * @param {string} dominantDomain - The domain that dominates results
+ * @param {string} query - User's message
+ * @param {string} baseSystemPrompt - OpSpec + affect complement (no memories)
+ * @returns {Promise<Array>} Re-ranked candidates with surprise scores
+ */
+async function surpriseRerank(candidates, dominantDomain, query, baseSystemPrompt) {
+  const startTime = performance.now();
+
+  // Take top 8 from dominant domain for re-ranking
+  const domainCandidates = candidates
+    .filter(m => (m.domain || 'unknown') === dominantDomain)
+    .sort((a, b) => (b.similarity || 0) - (a.similarity || 0))
+    .slice(0, 8);
+
+  console.log(`[Hearth:Surprise] Stage 2 starting - ${domainCandidates.length} candidates from domain "${dominantDomain}"`);
+
+  if (domainCandidates.length === 0) {
+    console.log('[Hearth:Surprise] No candidates in dominant domain, skipping Stage 2');
+    return candidates;
+  }
+
+  // Check if surprise scorer is available
+  const scorer = typeof window !== 'undefined' ? window.HearthSurpriseScorer : null;
+  if (!scorer) {
+    console.warn('[Hearth:Surprise] FALLBACK: Surprise scorer not loaded, returning Stage 1 results');
+    return candidates;
+  }
+  if (!OPENAI_API_KEY) {
+    console.warn('[Hearth:Surprise] FALLBACK: No OpenAI API key, returning Stage 1 results');
+    return candidates;
+  }
+
+  // Get cache module
+  const cache = typeof window !== 'undefined' ? window.HearthSurpriseCache : null;
+  const contextHash = cache ? cache.hashContext(query) : null;
+
+  try {
+    // Check cache for each memory, separate into cached and uncached
+    const cached = [];
+    const uncached = [];
+
+    for (const memory of domainCandidates) {
+      if (cache && memory.id) {
+        const cachedScore = cache.getCache(memory.id, contextHash);
+        if (cachedScore !== null) {
+          cached.push({ memory, surprise: cachedScore, fromCache: true });
+        } else {
+          uncached.push(memory);
+        }
+      } else {
+        uncached.push(memory);
+      }
+    }
+
+    console.log(`[Hearth:Surprise] Cache check: ${cached.length} hits, ${uncached.length} misses`);
+
+    // Log cached scores
+    if (cached.length > 0) {
+      console.log('[Hearth:Surprise] Cached scores:');
+      cached.forEach(({ memory, surprise }) => {
+        const preview = memory.content?.substring(0, 40) || 'no content';
+        console.log(`  [CACHED] KL=${surprise.toFixed(4)} "${preview}..."`);
+      });
+    }
+
+    let results = [...cached];
+
+    // Only make API calls for uncached memories
+    if (uncached.length > 0) {
+      console.log(`[Hearth:Surprise] Computing ${uncached.length} fresh KL scores...`);
+      const apiStartTime = performance.now();
+
+      // Get baseline distribution (no memories) - only if we have uncached
+      const baseline = await scorer.getFirstTokenDistribution(
+        OPENAI_API_KEY,
+        baseSystemPrompt,
+        query
+      );
+
+      // Get conditioned distributions for uncached candidates in parallel
+      const conditionedPromises = uncached.map(async (memory) => {
+        const memoryPrompt = `${baseSystemPrompt}\n\n[MEMORY]\n${memory.content}\n[/MEMORY]`;
+        try {
+          const conditioned = await scorer.getFirstTokenDistribution(
+            OPENAI_API_KEY,
+            memoryPrompt,
+            query
+          );
+          const surprise = scorer.computeSurpriseScore(baseline, conditioned);
+
+          // Store in cache
+          if (cache && memory.id) {
+            cache.setCache(memory.id, contextHash, surprise);
+          }
+
+          return { memory, surprise, fromCache: false };
+        } catch (memErr) {
+          // If individual memory scoring fails, give it neutral surprise
+          console.warn(`[Hearth:Surprise] Failed to score memory ${memory.id}: ${memErr.message}`);
+          return { memory, surprise: 0, fromCache: false, error: true };
+        }
+      });
+
+      const newResults = await Promise.all(conditionedPromises);
+      const apiLatency = Math.round(performance.now() - apiStartTime);
+      console.log(`[Hearth:Surprise] API calls completed in ${apiLatency}ms`);
+
+      // Log fresh scores
+      console.log('[Hearth:Surprise] Fresh scores:');
+      newResults.forEach(({ memory, surprise, error }) => {
+        const preview = memory.content?.substring(0, 40) || 'no content';
+        const status = error ? '[ERROR]' : '[FRESH]';
+        console.log(`  ${status} KL=${surprise.toFixed(4)} "${preview}..."`);
+      });
+
+      results = [...results, ...newResults];
+    }
+
+    // Sort by surprise descending and take top 5
+    const sorted = results.sort((a, b) => b.surprise - a.surprise);
+    const reranked = sorted
+      .slice(0, 5)
+      .map(r => ({
+        ...r.memory,
+        surprise_score: r.surprise,
+        stage2_reranked: true,
+        surprise_cached: r.fromCache
+      }));
+
+    // Log final ranking
+    console.log('[Hearth:Surprise] Final ranking (top 5):');
+    sorted.slice(0, 5).forEach(({ memory, surprise, fromCache }, i) => {
+      const preview = memory.content?.substring(0, 50) || 'no content';
+      const source = fromCache ? 'cached' : 'fresh';
+      console.log(`  ${i + 1}. KL=${surprise.toFixed(4)} (${source}) "${preview}..."`);
+    });
+
+    const totalLatency = Math.round(performance.now() - startTime);
+    console.log(`[Hearth:Surprise] Stage 2 complete - ${reranked.length} memories re-ranked in ${totalLatency}ms`);
+
+    // Return re-ranked domain candidates plus non-domain candidates
+    const nonDomainCandidates = candidates.filter(
+      m => (m.domain || 'unknown') !== dominantDomain
+    );
+
+    return [...reranked, ...nonDomainCandidates];
+  } catch (err) {
+    const totalLatency = Math.round(performance.now() - startTime);
+    console.warn(`[Hearth:Surprise] FALLBACK: Stage 2 failed after ${totalLatency}ms - ${err.message}`);
+    console.warn('[Hearth:Surprise] Error details:', err);
+    return candidates;
+  }
+}
+
+// ============================================================
 // Step 6: Deduplicate
 // ============================================================
 
@@ -535,10 +746,15 @@ function trackAccess(memoryIds) {
  * Every message gets embedded and semantically searched. No heat gating.
  * Similarity threshold is the gate.
  *
+ * Stage 1: Semantic search with cosine similarity
+ * Stage 2: Surprise re-ranking (KL divergence) when results are domain-dominated
+ *
  * @param {string} query - The user's message text
+ * @param {Object} [options] - Optional parameters
+ * @param {string} [options.baseSystemPrompt] - OpSpec + affect for Stage 2 surprise scoring
  * @returns {Promise<{ userMemories: Array, aiMemories: Array, injection: string|null, goal: string, debug: Object }>}
  */
-async function retrieve(query) {
+async function retrieve(query, options = {}) {
   const emptyResult = (goal = 'general') => ({
     userMemories: [],
     aiMemories: [],
@@ -563,18 +779,51 @@ async function retrieve(query) {
       searchPool(embedding, 'ai', ALL_TIME),
     ]);
 
-    const allCandidates = [...userResults, ...aiResults];
-    console.log('Hearth: Semantic search returned', allCandidates.length, 'candidates above threshold');
-
-    // Pattern/fact re-ranking — patterns encode process (more useful for shaping model behavior)
-    const PATTERN_BOOST = 1.3;
-    const FACT_WEIGHT = 0.85;
-    for (const m of allCandidates) {
-      m.similarity = m.similarity * (m.memory_class === 'pattern' ? PATTERN_BOOST : FACT_WEIGHT);
-    }
+    let allCandidates = [...userResults, ...aiResults];
+    console.log('Hearth: Stage 1 semantic search returned', allCandidates.length, 'candidates above threshold');
 
     if (allCandidates.length === 0) {
       return emptyResult();
+    }
+
+    // --- Stage 2: Check domain dominance and optionally re-rank by surprise ---
+    const domainCheck = detectDominantDomain(allCandidates);
+    let stage2Applied = false;
+
+    // Log domain distribution
+    const domainCounts = {};
+    allCandidates.forEach(m => {
+      const d = m.domain || 'unknown';
+      domainCounts[d] = (domainCounts[d] || 0) + 1;
+    });
+    console.log('[Hearth:Surprise] Domain distribution:', JSON.stringify(domainCounts));
+
+    if (domainCheck.isDominated && options.baseSystemPrompt) {
+      console.log(`[Hearth:Surprise] Domain dominance DETECTED: "${domainCheck.dominantDomain}" (${domainCheck.count}/${allCandidates.length} = ${Math.round(domainCheck.count/allCandidates.length*100)}%)`);
+      console.log('[Hearth:Surprise] Triggering Stage 2 surprise re-ranking...');
+      allCandidates = await surpriseRerank(
+        allCandidates,
+        domainCheck.dominantDomain,
+        query,
+        options.baseSystemPrompt
+      );
+      stage2Applied = true;
+    } else if (domainCheck.isDominated && !options.baseSystemPrompt) {
+      console.log(`[Hearth:Surprise] Domain dominance detected but no baseSystemPrompt provided - skipping Stage 2`);
+      // Apply pattern boost as fallback
+      const PATTERN_BOOST = 1.3;
+      const FACT_WEIGHT = 0.85;
+      for (const m of allCandidates) {
+        m.similarity = m.similarity * (m.memory_class === 'pattern' ? PATTERN_BOOST : FACT_WEIGHT);
+      }
+    } else {
+      // No domain dominance — apply pattern boost instead
+      console.log(`[Hearth:Surprise] No domain dominance (max: ${domainCheck.count}/${allCandidates.length}) - using Stage 1 with pattern boost`);
+      const PATTERN_BOOST = 1.3;
+      const FACT_WEIGHT = 0.85;
+      for (const m of allCandidates) {
+        m.similarity = m.similarity * (m.memory_class === 'pattern' ? PATTERN_BOOST : FACT_WEIGHT);
+      }
     }
 
     // --- Step 3: Goal classification ---
@@ -614,7 +863,13 @@ async function retrieve(query) {
     const topScores = scored
       .sort((a, b) => b.score - a.score)
       .slice(0, 6)
-      .map((c) => ({ id: c.id, type: c.type, pool: c.pool, score: Math.round(c.score * 1000) / 1000 }));
+      .map((c) => ({
+        id: c.id,
+        type: c.type,
+        pool: c.pool,
+        score: Math.round(c.score * 1000) / 1000,
+        surprise: c.surprise_score ? Math.round(c.surprise_score * 1000) / 1000 : undefined
+      }));
 
     return {
       userMemories,
@@ -625,6 +880,11 @@ async function retrieve(query) {
         candidateCounts: { user: userResults.length, ai: aiResults.length },
         afterDedup: deduped.length,
         topScores,
+        stage2: {
+          applied: stage2Applied,
+          dominantDomain: domainCheck.dominantDomain,
+          domainCount: domainCheck.count
+        }
       },
     };
   } catch (err) {
@@ -646,6 +906,8 @@ if (typeof window !== 'undefined') {
     estimateHeatFromQuery,
     classifyGoal,
     getTemporalWindow,
+    detectDominantDomain,
+    surpriseRerank,
   };
 }
 
@@ -658,5 +920,7 @@ if (typeof module !== 'undefined' && module.exports) {
     estimateHeatFromQuery,
     classifyGoal,
     getTemporalWindow,
+    detectDominantDomain,
+    surpriseRerank,
   };
 }

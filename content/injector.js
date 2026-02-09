@@ -295,6 +295,8 @@ const HearthInjector = {
       'utils/scout/scoutAnalyzerV2.js',
       'utils/memoryExtractor.js',
       'utils/aiMemoryExtractor.js',
+      'src/retrieval/surprise-cache.js',
+      'src/retrieval/surprise-scorer.js',
       'src/retrieval/hearth-retrieval.js'
     ];
 

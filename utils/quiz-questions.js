@@ -1,17 +1,17 @@
-// quiz-questions.js - The 10 personality questions
+// quiz-questions.js - The 9 personality questions
 
 const QUIZ_QUESTIONS = [
-  // SECTION 1: WHO YOU ARE
+  // SECTION 1: WHAT YOU NEED
   {
     id: 'identity',
-    section: 'who_you_are',
-    text: "First, tell me about yourself. You're:",
+    section: 'what_you_need',
+    text: "What do you most want help with?",
     type: 'single',
     answers: [
-      { id: 'A', text: 'A technical expert in my field', emoji: '🔬' },
-      { id: 'B', text: 'Ambitious and learning as I go (vibe coder energy)', emoji: '🚀' },
-      { id: 'C', text: 'A creative experimenter - I learn by building', emoji: '🎨' },
-      { id: 'D', text: 'A strategic planner - I think several steps ahead', emoji: '♟️' }
+      { id: 'A', text: 'Help me think through complex decisions', emoji: '🧭' },
+      { id: 'B', text: 'Help me build things faster', emoji: '🚀' },
+      { id: 'C', text: 'Help me explore and develop ideas', emoji: '💡' },
+      { id: 'D', text: 'Help me communicate more effectively', emoji: '🎯' }
     ]
   },
 
@@ -123,22 +123,6 @@ const QUIZ_QUESTIONS = [
       { id: 'B', text: 'A little is fine, too much is annoying', emoji: '⚠️' },
       { id: 'C', text: 'Just commit to an answer', emoji: '💪' },
       { id: 'D', text: 'I\'d rather confident and wrong than tentative and right', emoji: '🎲' }
-    ]
-  },
-
-  {
-    id: 'dealbreakers',
-    section: 'bright_lines',
-    text: "I'd close the tab if an AI:",
-    type: 'multi',
-    instruction: 'Select all that apply',
-    answers: [
-      { id: 'A', text: 'Acts confident while clearly guessing', emoji: '🎭' },
-      { id: 'B', text: 'Gives me 10 options without helping choose', emoji: '😵' },
-      { id: 'C', text: 'Uses overly formal/robotic language', emoji: '🤖' },
-      { id: 'D', text: 'Apologizes excessively', emoji: '🙏' },
-      { id: 'E', text: 'Uses corporate speak and buzzwords', emoji: '💼' },
-      { id: 'F', text: 'Avoids giving direct answers', emoji: '🌫️' }
     ]
   }
 ];

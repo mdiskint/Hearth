@@ -221,6 +221,19 @@ function classifyAIMemoryEmotion(content, context) {
 }
 
 /**
+ * Invalidate the surprise cache when synthesis is detected.
+ * Synthesis moments indicate the model has integrated new understanding,
+ * so old surprise rankings should be recomputed fresh.
+ */
+function invalidateSurpriseCacheOnSynthesis() {
+  // Browser context - access via window
+  if (typeof window !== 'undefined' && window.HearthSurpriseCache) {
+    window.HearthSurpriseCache.invalidateAll();
+    console.log('Hearth: Synthesis detected - surprise cache invalidated');
+  }
+}
+
+/**
  * Process a Claude response and extract any AI memories
  * @param {string} assistantContent - Claude's response
  * @param {Object} context - Context including user message, heat, etc.
@@ -228,9 +241,16 @@ function classifyAIMemoryEmotion(content, context) {
  */
 function processAssistantResponse(assistantContent, context = {}) {
   const detection = detectAIMemoryPattern(assistantContent);
-  
+
   if (!detection) return null;
-  
+
+  // Synthesis detection triggers two actions:
+  // 1. Extract the AI memory (below)
+  // 2. Invalidate surprise cache so rankings recompute fresh
+  if (detection.type === 'synthesis') {
+    invalidateSurpriseCacheOnSynthesis();
+  }
+
   return extractAIMemory(assistantContent, detection, context);
 }
 
