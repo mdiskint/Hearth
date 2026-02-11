@@ -666,7 +666,8 @@ server.registerTool(
 
     // 5. Get Active Trajectory
     try {
-      const userId = process.env.HEARTH_USER_ID ?? "95aa73e2-ac1a-4ac6-bfae-15a946b11131";
+      const userId = process.env.HEARTH_USER_ID;
+      if (!userId) throw new Error("HEARTH_USER_ID environment variable is required");
       const trajectory = await getActiveTrajectory(userId);
 
       if (trajectory && trajectory.compressed) {
@@ -1329,7 +1330,8 @@ server.registerTool(
   },
   async () => {
     try {
-      const userId = process.env.HEARTH_USER_ID ?? "95aa73e2-ac1a-4ac6-bfae-15a946b11131";
+      const userId = process.env.HEARTH_USER_ID;
+      if (!userId) throw new Error("HEARTH_USER_ID environment variable is required");
       const trajectory = await getActiveTrajectory(userId);
 
       if (!trajectory) {
