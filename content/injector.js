@@ -138,9 +138,13 @@ const HearthInjector = {
               { userMessage: this.lastUserMessage }
             );
             if (aiMemory) {
-              this.pendingMemories.push(aiMemory);
-              console.log('Hearth: Extracted AI memory:', aiMemory.type, '- pending:', this.pendingMemories.length);
-              this.debouncedFlush();
+              if (!window.HearthAIMemoryExtractor.isAIMemoryWorthy(event.data.content)) {
+                console.log('Hearth: AI memory rejected by worthiness check');
+              } else {
+                this.pendingMemories.push(aiMemory);
+                console.log('Hearth: Extracted AI memory:', aiMemory.type, '- pending:', this.pendingMemories.length);
+                this.debouncedFlush();
+              }
             }
           } catch (e) {
             console.warn('Hearth: AI memory extraction failed:', e);
@@ -219,6 +223,7 @@ const HearthInjector = {
     this.pendingMemories = [];
     console.log(`Hearth: Flushing ${batch.length} pending memories`);
 
+    let writtenCount = 0;
     for (const candidate of batch) {
       try {
         // Strip metadata (not a DB column) and map field names to match Supabase schema
@@ -229,6 +234,7 @@ const HearthInjector = {
         const result = await window.HearthSupabase.writeMemory(memoryData);
         if (result) {
           this.memories.push(result);
+          writtenCount++;
           console.log('Hearth: Wrote memory:', memoryData.type, result.id);
         } else {
           console.warn('Hearth: writeMemory returned null for:', memoryData.type);
@@ -237,6 +243,62 @@ const HearthInjector = {
         console.error('Hearth: writeMemory failed for:', candidate.type, e);
       }
     }
+
+    // Track trajectory synthesis counter
+    if (writtenCount > 0) {
+      this.checkTrajectorySynthesisTrigger(writtenCount);
+    }
+  },
+
+  /**
+   * Increment trajectory counter and trigger synthesis if threshold reached.
+   * Counter stored in chrome.storage.local as 'trajectory_memories_since_synthesis'.
+   * Threshold: 15 new memories triggers a trajectory re-synthesis.
+   */
+  async checkTrajectorySynthesisTrigger(newCount) {
+    try {
+      const data = await chrome.storage.local.get(['trajectory_memories_since_synthesis']);
+      const current = data.trajectory_memories_since_synthesis || 0;
+      const updated = current + newCount;
+
+      if (updated >= 15) {
+        console.log(`[Hearth:Trajectory] Threshold reached (${updated} memories since last synthesis), triggering synthesis`);
+        await chrome.storage.local.set({ trajectory_memories_since_synthesis: 0 });
+
+        // Get user ID and trigger synthesis in page context
+        const userData = await chrome.storage.local.get(['supabaseUser']);
+        const userId = userData.supabaseUser?.id;
+        if (userId) {
+          window.postMessage({
+            type: 'HEARTH_TRIGGER_TRAJECTORY_SYNTHESIS',
+            userId,
+            memoriesSinceLast: updated,
+          }, '*');
+        } else {
+          console.warn('[Hearth:Trajectory] No user ID available for synthesis');
+        }
+      } else {
+        await chrome.storage.local.set({ trajectory_memories_since_synthesis: updated });
+        console.log(`[Hearth:Trajectory] Counter: ${updated}/15 memories since last synthesis`);
+      }
+    } catch (e) {
+      console.warn('[Hearth:Trajectory] Counter update failed:', e);
+    }
+  },
+
+  /**
+   * Manual trajectory synthesis trigger (for testing).
+   * Call from DevTools: HearthInjector.triggerTrajectorySynthesis()
+   */
+  async triggerTrajectorySynthesis() {
+    const userData = await chrome.storage.local.get(['supabaseUser']);
+    const userId = userData.supabaseUser?.id || '95aa73e2-ac1a-4ac6-bfae-15a946b11131';
+    console.log('[Hearth:Trajectory] Manual synthesis trigger for user:', userId);
+    window.postMessage({
+      type: 'HEARTH_TRIGGER_TRAJECTORY_SYNTHESIS',
+      userId,
+      memoriesSinceLast: 0,
+    }, '*');
   },
 
   setupFetchInterceptor() {
@@ -297,7 +359,9 @@ const HearthInjector = {
       'utils/aiMemoryExtractor.js',
       'src/retrieval/surprise-cache.js',
       'src/retrieval/surprise-scorer.js',
-      'src/retrieval/hearth-retrieval.js'
+      'src/retrieval/hearth-retrieval.js',
+      'src/retrieval/memory-reframer.js',
+      'src/retrieval/trajectory-synthesizer.js'
     ];
 
     for (const modulePath of modules) {
@@ -337,11 +401,16 @@ const HearthInjector = {
   },
 
   async sendDataToInterceptor() {
+    // Get user ID for trajectory injection
+    const userData = await chrome.storage.local.get(['supabaseUser']);
+    const userId = userData.supabaseUser?.id || null;
+
     console.log('Hearth: sendDataToInterceptor',
       'opspec:', !!this.opspec,
       'openaiKey:', !!this.openaiKey,
       'queryHeat:', this.lastQueryHeat,
-      'forge:', this.forgeEnabled ? (this.forgeAutoDetect ? 'auto' : this.forgePhase) : 'off'
+      'forge:', this.forgeEnabled ? (this.forgeAutoDetect ? 'auto' : this.forgePhase) : 'off',
+      'userId:', !!userId
     );
     // Send data to fetch interceptor (affect + retrieval handled in page context)
     window.postMessage({
@@ -351,7 +420,8 @@ const HearthInjector = {
       openaiKey: this.openaiKey,
       forgeEnabled: this.forgeEnabled,
       forgePhase: this.forgePhase,
-      forgeAutoDetect: this.forgeAutoDetect
+      forgeAutoDetect: this.forgeAutoDetect,
+      userId: userId
     }, '*');
   },
 

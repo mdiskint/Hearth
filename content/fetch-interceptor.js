@@ -92,6 +92,7 @@
 
   // Listen for data via postMessage (CSP-safe)
   let retrievalInitialized = false;
+  let trajectoryInitialized = false;
   window.addEventListener('message', (event) => {
     if (event.data && event.data.type === 'HEARTH_DATA') {
       hearthData = event.data;
@@ -117,6 +118,36 @@
           retrievalInitialized = true;
           console.log('Hearth: Retrieval pipeline initialized');
         }
+      }
+
+      // Initialize trajectory synthesizer once we have the OpenAI key
+      if (!trajectoryInitialized && event.data.openaiKey && window.HearthTrajectory) {
+        window.HearthTrajectory.init({
+          supabaseUrl: 'https://wkfwtivvhwyjlkyrikeu.supabase.co',
+          supabaseAnonKey: 'sb_publishable_7lxIUGtOAArrrW2t5_mQFg_p24QQDKO',
+          openaiApiKey: event.data.openaiKey,
+        });
+        trajectoryInitialized = true;
+        console.log('[Hearth:Trajectory] Trajectory synthesizer initialized');
+      }
+    }
+
+    // Trajectory synthesis trigger from content script
+    if (event.data && event.data.type === 'HEARTH_TRIGGER_TRAJECTORY_SYNTHESIS') {
+      if (window.HearthTrajectory) {
+        window.HearthTrajectory.synthesize(event.data.userId, event.data.memoriesSinceLast)
+          .then(result => {
+            if (result) {
+              console.log('[Hearth:Trajectory] Synthesis completed successfully');
+            } else {
+              console.warn('[Hearth:Trajectory] Synthesis returned null');
+            }
+          })
+          .catch(err => {
+            console.error('[Hearth:Trajectory] Synthesis error:', err);
+          });
+      } else {
+        console.warn('[Hearth:Trajectory] HearthTrajectory not available for synthesis trigger');
       }
     }
   });
@@ -624,9 +655,13 @@ ${narrativeSection}`;
                     ? `${routedOpSpec}${affectSection}`.trim()
                     : affectSection.trim();
 
+                  const affectDescription = affectShape && window.HearthAffectDetector
+                    ? window.HearthAffectDetector.describeAffect(affectShape)
+                    : null;
+
                   const retrieval = await window.HearthRetrieval.retrieve(
                     capturedUserMessage,
-                    { baseSystemPrompt }
+                    { baseSystemPrompt, affectDescription, affectShape }
                   );
                   console.log('Hearth: Retrieval result',
                     'injection:', !!retrieval.injection,
@@ -643,16 +678,34 @@ ${narrativeSection}`;
                 }
               }
 
-              // Pipeline order: OpSpec → Affect Complement → Forge Complement → Memories → user message
+              // Fetch active trajectory for injection
+              let trajectorySection = '';
+              if (hearthData?.userId && window.HearthTrajectory) {
+                try {
+                  const trajectory = await window.HearthTrajectory.getActive(hearthData.userId);
+                  if (trajectory && trajectory.compressed) {
+                    const genDate = trajectory.generated_at
+                      ? new Date(trajectory.generated_at).toISOString().split('T')[0]
+                      : 'unknown';
+                    trajectorySection = `\n\n[TRAJECTORY]\nGenerated: ${genDate} | ${trajectory.memory_count} memories\n\n${trajectory.compressed}\n[/TRAJECTORY]`;
+                    console.log('[Hearth:Trajectory] Injecting trajectory -', trajectory.compressed.length, 'chars');
+                  }
+                } catch (trajError) {
+                  console.warn('[Hearth:Trajectory] Trajectory fetch failed:', trajError);
+                }
+              }
+
+              // Pipeline order: OpSpec → Affect Complement → Forge Complement → Memories → Trajectory → user message
               const fullContext = routedOpSpec
-                ? `${routedOpSpec}\n\n${context}${affectSection}${forgeSection}${memorySection}`
-                : `${context}${affectSection}${forgeSection}${memorySection}`;
+                ? `${routedOpSpec}\n\n${context}${affectSection}${forgeSection}${memorySection}${trajectorySection}`
+                : `${context}${affectSection}${forgeSection}${memorySection}${trajectorySection}`;
 
               // Debug: Log what sections are included
               console.log('Hearth: Injection debug -',
                 'affectSection:', affectSection.length, 'chars',
                 'forgeSection:', forgeSection.length, 'chars',
                 'memorySection:', memorySection.length, 'chars',
+                'trajectorySection:', trajectorySection.length, 'chars',
                 'fullContext:', fullContext.length, 'chars'
               );
               if (forgeSection) {
@@ -734,50 +787,107 @@ ${narrativeSection}`;
   };
 
   /**
-   * Collect streaming response chunks into complete message
+   * Collect streaming response chunks into complete message.
+   *
+   * Handles three wire formats:
+   *   1. SSE  – lines prefixed with "data:" (with or without trailing space)
+   *   2. NDJSON – bare JSON objects, one per line
+   *   3. Claude web – may use either format above
+   *
+   * And four payload schemas:
+   *   a. Claude API     – content_block_delta  { delta.text }
+   *   b. Claude web     – completion           { completion }
+   *   c. OpenAI/ChatGPT – choices[0].delta.content
+   *   d. Gemini         – candidates[0].content.parts[0].text
    */
   async function collectStreamingResponse(response, url) {
     try {
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
       let fullContent = '';
+      let buffer = ''; // accumulate across chunks to handle split lines
 
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
 
-        const chunk = decoder.decode(value, { stream: true });
-        const lines = chunk.split('\n');
+        buffer += decoder.decode(value, { stream: true });
 
-        for (const line of lines) {
-          if (line.startsWith('data: ')) {
-            const data = line.slice(6);
-            if (data === '[DONE]') continue;
+        // Split on newline but keep the last (possibly incomplete) segment
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
 
-            try {
-              const parsed = JSON.parse(data);
+        for (const rawLine of lines) {
+          const line = rawLine.trim();
+          if (!line) continue;
 
-              // OpenAI/ChatGPT streaming format
-              if (parsed.choices?.[0]?.delta?.content) {
-                fullContent += parsed.choices[0].delta.content;
-              }
+          // --- extract JSON payload from the line ---
+          let jsonStr = null;
 
-              // Claude streaming format
-              if (parsed.type === 'content_block_delta' && parsed.delta?.text) {
-                fullContent += parsed.delta.text;
-              }
+          if (line.startsWith('data:')) {
+            // SSE format – strip "data:" prefix (handle "data: " and "data:")
+            const payload = line.slice(5).trim();
+            if (payload === '[DONE]') continue;
+            jsonStr = payload;
+          } else if (line.startsWith('{')) {
+            // NDJSON – bare JSON object
+            jsonStr = line;
+          } else {
+            // event:, id:, comments (:), etc. – skip
+            continue;
+          }
 
-              // Gemini streaming format
-              if (parsed.candidates?.[0]?.content?.parts?.[0]?.text) {
-                fullContent += parsed.candidates[0].content.parts[0].text;
-              }
-            } catch (parseError) {
-              // Skip non-JSON lines
+          if (!jsonStr) continue;
+
+          try {
+            const parsed = JSON.parse(jsonStr);
+
+            // OpenAI/ChatGPT streaming format
+            if (parsed.choices?.[0]?.delta?.content) {
+              fullContent += parsed.choices[0].delta.content;
             }
+
+            // Claude API streaming format (content_block_delta)
+            if (parsed.type === 'content_block_delta' && parsed.delta?.text) {
+              fullContent += parsed.delta.text;
+            }
+
+            // Claude web streaming format (completion events)
+            if (parsed.type === 'completion' && typeof parsed.completion === 'string') {
+              fullContent += parsed.completion;
+            }
+
+            // Gemini streaming format
+            if (parsed.candidates?.[0]?.content?.parts?.[0]?.text) {
+              fullContent += parsed.candidates[0].content.parts[0].text;
+            }
+          } catch (parseError) {
+            // Skip non-JSON lines
           }
         }
       }
 
+      // Flush any remaining buffer content
+      if (buffer.trim()) {
+        const line = buffer.trim();
+        let jsonStr = null;
+        if (line.startsWith('data:')) {
+          jsonStr = line.slice(5).trim();
+        } else if (line.startsWith('{')) {
+          jsonStr = line;
+        }
+        if (jsonStr && jsonStr !== '[DONE]') {
+          try {
+            const parsed = JSON.parse(jsonStr);
+            if (parsed.choices?.[0]?.delta?.content) fullContent += parsed.choices[0].delta.content;
+            if (parsed.type === 'content_block_delta' && parsed.delta?.text) fullContent += parsed.delta.text;
+            if (parsed.type === 'completion' && typeof parsed.completion === 'string') fullContent += parsed.completion;
+            if (parsed.candidates?.[0]?.content?.parts?.[0]?.text) fullContent += parsed.candidates[0].content.parts[0].text;
+          } catch (_) { /* ignore */ }
+        }
+      }
+
+      console.log('Hearth: Stream collection complete:', fullContent.length, 'chars extracted');
       return fullContent || null;
     } catch (e) {
       console.warn('Hearth: Error collecting streaming response', e);
