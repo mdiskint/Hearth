@@ -1,0 +1,687 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Babel — Agent Integrity Infrastructure · Hearth</title>
+<meta name="description" content="The validation layer that catches confidence corruption in multi-agent pipelines. Chain auditing, basis laundering detection, grammar validation.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;1,400&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #0a0a0c;
+  --bg-elevated: #111114;
+  --bg-card: #16161a;
+  --surface: #1e1e23;
+  --border: #2a2a30;
+  --text: #e8e6e3;
+  --text-dim: #8a8a8e;
+  --text-muted: #5a5a5e;
+  --accent: #58a6ff;
+  --accent-deep: #1f6feb;
+  --accent-glow: #58a6ff30;
+  --red: #f85149;
+  --green: #3fb950;
+  --orange: #d29922;
+  --hearth-orange: #e8643a;
+  --serif: 'Instrument Serif', Georgia, serif;
+  --sans: 'DM Sans', -apple-system, sans-serif;
+  --mono: 'JetBrains Mono', monospace;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+html {
+  scroll-behavior: smooth;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--sans);
+  font-size: 17px;
+  line-height: 1.65;
+  -webkit-font-smoothing: antialiased;
+}
+
+body { overflow-x: hidden; }
+
+::selection {
+  background: var(--accent);
+  color: var(--bg);
+}
+
+/* ─── NAV ─── */
+nav {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  z-index: 100;
+  padding: 1rem 2rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #0a0a0cee;
+  backdrop-filter: blur(20px);
+  border-bottom: 1px solid var(--border);
+}
+
+nav .logo {
+  font-family: var(--serif);
+  font-size: 1.4rem;
+  color: var(--hearth-orange);
+  text-decoration: none;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+nav .logo span { font-size: 1.2rem; }
+
+nav .nav-links {
+  display: flex;
+  gap: 2rem;
+  align-items: center;
+}
+
+nav .nav-links a {
+  color: var(--text-dim);
+  text-decoration: none;
+  font-size: 0.85rem;
+  font-weight: 500;
+  letter-spacing: 0.03em;
+  transition: color 0.2s;
+}
+
+nav .nav-links a:hover { color: var(--text); }
+nav .nav-links a.active { color: var(--accent); }
+
+.cta-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.6rem 1.4rem;
+  background: var(--accent-deep);
+  color: white;
+  text-decoration: none;
+  font-weight: 600;
+  font-size: 0.85rem;
+  border-radius: 6px;
+  transition: all 0.2s;
+  letter-spacing: 0.02em;
+}
+
+.cta-btn:hover {
+  background: var(--accent);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 20px var(--accent-glow);
+}
+
+/* ─── HERO ─── */
+.hero {
+  min-height: 85vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 8rem 2rem 4rem;
+  max-width: 900px;
+  margin: 0 auto;
+  position: relative;
+}
+
+.hero::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 600px;
+  height: 600px;
+  background: radial-gradient(circle, var(--accent-glow) 0%, transparent 70%);
+  pointer-events: none;
+  opacity: 0.4;
+}
+
+.hero-label {
+  font-family: var(--mono);
+  font-size: 0.75rem;
+  color: var(--accent);
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  margin-bottom: 1.5rem;
+  opacity: 0;
+  animation: fadeUp 0.8s ease forwards;
+}
+
+.hero h1 {
+  font-family: var(--serif);
+  font-size: clamp(2.8rem, 6vw, 4.2rem);
+  line-height: 1.1;
+  font-weight: 400;
+  margin-bottom: 1.5rem;
+  opacity: 0;
+  animation: fadeUp 0.8s ease 0.1s forwards;
+}
+
+.hero h1 em {
+  font-style: italic;
+  color: var(--accent);
+}
+
+.hero-sub {
+  font-size: 1.15rem;
+  color: var(--text-dim);
+  max-width: 620px;
+  margin-bottom: 2.5rem;
+  opacity: 0;
+  animation: fadeUp 0.8s ease 0.2s forwards;
+}
+
+.hero-actions {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+  flex-wrap: wrap;
+  opacity: 0;
+  animation: fadeUp 0.8s ease 0.3s forwards;
+}
+
+.hero-secondary {
+  color: var(--text-dim);
+  text-decoration: none;
+  font-size: 0.9rem;
+  padding: 0.6rem 1.2rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  transition: all 0.2s;
+}
+
+.hero-secondary:hover {
+  border-color: var(--text-dim);
+  color: var(--text);
+}
+
+.hero-stat-row {
+  display: flex;
+  gap: 3rem;
+  margin-top: 4rem;
+  padding-top: 2rem;
+  border-top: 1px solid var(--border);
+  opacity: 0;
+  animation: fadeUp 0.8s ease 0.5s forwards;
+}
+
+.hero-stat .num {
+  font-family: var(--mono);
+  font-size: 1.8rem;
+  color: var(--accent);
+  font-weight: 500;
+}
+
+.hero-stat .label {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  margin-top: 0.2rem;
+}
+
+/* ─── SECTIONS ─── */
+section {
+  padding: 5rem 2rem;
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+.section-label {
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  margin-bottom: 1rem;
+}
+
+section h2 {
+  font-family: var(--serif);
+  font-size: clamp(2rem, 4vw, 2.6rem);
+  font-weight: 400;
+  line-height: 1.2;
+  margin-bottom: 1.5rem;
+}
+
+section h2 em {
+  font-style: italic;
+  color: var(--accent);
+}
+
+section p {
+  color: var(--text-dim);
+  margin-bottom: 1.2rem;
+  max-width: 680px;
+}
+
+/* ─── DARK SECTIONS ─── */
+.dark-section {
+  max-width: 100%;
+  padding: 5rem 0;
+  background: var(--bg-elevated);
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+}
+
+.dark-inner {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 0 2rem;
+}
+
+/* ─── CHAIN TABLE ─── */
+.chain-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--sans);
+  font-size: 0.9rem;
+  margin: 1.5rem 0;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.chain-table th {
+  background: var(--accent-deep);
+  color: white;
+  padding: 0.7rem 1rem;
+  text-align: left;
+  font-weight: 600;
+  font-size: 0.8rem;
+  letter-spacing: 0.03em;
+}
+
+.chain-table td {
+  padding: 0.7rem 1rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.chain-table tr.row-safe td { background: #0d281810; }
+.chain-table tr.row-warn td { background: #2a1f0d15; }
+.chain-table tr.row-danger td { background: #2a0d0d18; }
+
+.chain-table .basis-safe { color: var(--green); font-family: var(--mono); font-size: 0.8rem; }
+.chain-table .basis-warn { color: var(--orange); font-family: var(--mono); font-size: 0.8rem; }
+.chain-table .basis-danger { color: var(--red); font-family: var(--mono); font-size: 0.8rem; }
+
+.chain-table .score {
+  font-family: var(--mono);
+  font-size: 0.85rem;
+}
+
+/* ─── CARDS ─── */
+.card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 2rem;
+  margin-bottom: 1.5rem;
+  transition: border-color 0.3s;
+}
+
+.card:hover { border-color: #3a3a40; }
+
+/* ─── STATS ROW ─── */
+.stats-row {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1px;
+  background: var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+  margin: 1.5rem 0;
+}
+
+.stat-cell {
+  background: var(--bg-card);
+  padding: 1.5rem 1rem;
+  text-align: center;
+}
+
+.stat-cell .num {
+  font-family: var(--mono);
+  font-size: 1.6rem;
+  color: var(--accent);
+  font-weight: 500;
+  line-height: 1;
+}
+
+.stat-cell .label {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  margin-top: 0.4rem;
+  line-height: 1.3;
+}
+
+/* ─── AUDIT RESULT ─── */
+.audit-result {
+  background: var(--surface);
+  border-radius: 8px;
+  padding: 1.5rem;
+  border-left: 3px solid var(--red);
+  margin: 1.5rem 0;
+  font-family: var(--mono);
+  font-size: 0.85rem;
+  color: var(--text-dim);
+}
+
+.audit-result .risk-badge {
+  display: inline-block;
+  background: var(--red);
+  color: white;
+  padding: 0.15rem 0.6rem;
+  border-radius: 3px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  margin-bottom: 0.8rem;
+}
+
+.audit-result .detection {
+  margin-bottom: 0.5rem;
+}
+
+.audit-result .detection strong {
+  color: var(--text);
+}
+
+/* ─── CLEAN AUDIT ─── */
+.clean-result {
+  background: var(--surface);
+  border-radius: 8px;
+  padding: 1.5rem;
+  border-left: 3px solid var(--green);
+  margin: 1.5rem 0;
+  font-family: var(--mono);
+  font-size: 0.85rem;
+  color: var(--text-dim);
+}
+
+.clean-result .clean-badge {
+  display: inline-block;
+  background: var(--green);
+  color: var(--bg);
+  padding: 0.15rem 0.6rem;
+  border-radius: 3px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+}
+
+/* ─── CODE BLOCK ─── */
+.code-block {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 1.5rem;
+  margin: 1.5rem 0;
+  font-family: var(--mono);
+  font-size: 0.8rem;
+  color: var(--text-dim);
+  overflow-x: auto;
+  line-height: 1.6;
+}
+
+.code-block .comment { color: var(--text-muted); }
+.code-block .keyword { color: var(--accent); }
+.code-block .string { color: var(--green); }
+.code-block .fn { color: #d2a8ff; }
+
+/* ─── FOOTER ─── */
+footer {
+  padding: 3rem 2rem;
+  border-top: 1px solid var(--border);
+  text-align: center;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+footer a {
+  color: var(--text-dim);
+  text-decoration: none;
+  margin: 0 0.8rem;
+}
+
+footer a:hover { color: var(--text); }
+
+/* ─── ANIMATIONS ─── */
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.fade-in {
+  opacity: 0;
+  transform: translateY(20px);
+  transition: all 0.6s ease;
+}
+
+.fade-in.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* ─── RESPONSIVE ─── */
+@media (max-width: 768px) {
+  .hero-stat-row { gap: 1.5rem; flex-wrap: wrap; }
+  .stats-row { grid-template-columns: repeat(2, 1fr); }
+  nav .nav-links a:not(.cta-btn) { display: none; }
+}
+
+@media (max-width: 480px) {
+  .hero { padding: 6rem 1.2rem 3rem; }
+  section { padding: 3rem 1.2rem; }
+}
+</style>
+</head>
+<body>
+
+<nav>
+  <a href="/" class="logo"><span>🔥</span> Hearth</a>
+  <div class="nav-links">
+    <a href="/" >Extension</a>
+    <a href="/babel" class="active">Babel</a>
+    <a href="/research">Research</a>
+    <a href="https://github.com/mdiskint/babel-validate" class="cta-btn">GitHub</a>
+  </div>
+</nav>
+
+<!-- HERO -->
+<div class="hero">
+  <div class="hero-label">Agent Integrity Infrastructure · v0.3.0</div>
+  <h1>Agent handoffs <em>leak confidence</em>. We built the fix.</h1>
+  <p class="hero-sub">Babel is a validated wire protocol that catches metacognitive poisoning — when Agent A's uncertain guess becomes Agent B's confident input. Grammar validation catches local contradictions. The chain auditor catches global corruption.</p>
+  <div class="hero-actions">
+    <a href="https://npmjs.com/package/babel-validate" class="cta-btn">npm install babel-validate</a>
+    <a href="https://github.com/mdiskint/babel-validate" class="hero-secondary">View source</a>
+  </div>
+  <div class="hero-stat-row">
+    <div class="hero-stat">
+      <span class="num">+0.60</span>
+      <span class="label">Quality gain w/ envelopes</span>
+    </div>
+    <div class="hero-stat">
+      <span class="num">-0.76</span>
+      <span class="label">Loss w/ wrong metadata</span>
+    </div>
+    <div class="hero-stat">
+      <span class="num">60%</span>
+      <span class="label">Derived claims overconfident</span>
+    </div>
+    <div class="hero-stat">
+      <span class="num">12</span>
+      <span class="label">Experiments · 5,500+ calls</span>
+    </div>
+  </div>
+</div>
+
+<!-- THE PROBLEM -->
+<section class="dark-section">
+  <div class="dark-inner">
+    <div class="section-label">The Problem</div>
+    <h2>Nobody named this <em>until now</em></h2>
+    <p>Agent A researches a topic and writes a confident summary. Agent B reads it and makes a decision. But Agent A was guessing — it just didn't say so. By Agent C, the original uncertainty has vanished entirely.</p>
+    <p>This is <strong style="color: var(--accent);">metacognitive poisoning</strong> — cognitive state corruption that propagates through handoff chains. It's not hallucination. It's not a retrieval failure. It's what happens when agents can read each other's words but can't read each other's minds.</p>
+    <p>Three independent research groups published work in January 2026 proving this is an <em>architectural invariant</em> — it cannot be eliminated by improving model quality. It's a protocol problem. Babel is the protocol-level solution.</p>
+  </div>
+</section>
+
+<!-- BASIS LAUNDERING DEMO -->
+<section>
+  <div class="section-label">Chain Auditor</div>
+  <h2>Basis laundering — <em>caught</em></h2>
+  <p>Three agents pass a growth estimate through a chain. Each envelope passes grammar validation individually. Only the chain auditor sees the pattern.</p>
+
+  <table class="chain-table fade-in" data-animate>
+    <thead>
+      <tr><th>Agent</th><th>Claim</th><th>Basis</th><th>Score</th></tr>
+    </thead>
+    <tbody>
+      <tr class="row-safe">
+        <td>Scout</td>
+        <td>"Growth rate likely around 12%"</td>
+        <td><span class="basis-safe">DERIVED</span></td>
+        <td><span class="score">0.65</span></td>
+      </tr>
+      <tr class="row-warn">
+        <td>Analyst</td>
+        <td>"Growth rate is 12%"</td>
+        <td><span class="basis-warn">DERIVED</span></td>
+        <td><span class="score">0.82</span></td>
+      </tr>
+      <tr class="row-danger">
+        <td>Strategist</td>
+        <td>"12% growth confirmed"</td>
+        <td><span class="basis-danger">VERIFIED_DATA</span></td>
+        <td><span class="score">0.93</span></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="audit-result fade-in" data-animate>
+    <div class="risk-badge">⚠ HIGH POISONING RISK</div>
+    <div class="detection"><strong>Confidence inflation:</strong> +28% across 3 handoffs</div>
+    <div class="detection"><strong>Basis laundering:</strong> DERIVED → VERIFIED_DATA at seq 2</div>
+    <div class="detection">Uncertainty repackaged as verified data. Original estimate erased.</div>
+  </div>
+
+  <p style="color: var(--text-dim); font-size: 0.9rem;">Without the auditor, the board gets "confirmed 12% growth" that was always an estimate. With it, the poisoning is flagged before the memo is written.</p>
+
+  <div style="margin-top: 2rem;">
+    <p style="color: var(--text-muted); font-size: 0.85rem; margin-bottom: 0.5rem;">The same chain, with confidence preserved:</p>
+    <div class="clean-result">
+      <div class="clean-badge">✓ CLEAN</div>
+      <span style="margin-left: 0.8rem;">DERIVED @ 0.65 → DERIVED @ 0.68 → DERIVED @ 0.70 · No poisoning detected</span>
+    </div>
+  </div>
+</section>
+
+<!-- EVIDENCE -->
+<section class="dark-section">
+  <div class="dark-inner">
+    <div class="section-label">The Evidence</div>
+    <h2>Twelve experiments. <em>Non-overlapping CIs.</em></h2>
+
+    <div class="stats-row fade-in" data-animate>
+      <div class="stat-cell">
+        <div class="num">4.86</div>
+        <div class="label">Mean score<br>with envelopes</div>
+      </div>
+      <div class="stat-cell">
+        <div class="num">4.26</div>
+        <div class="label">Mean score<br>flat text only</div>
+      </div>
+      <div class="stat-cell">
+        <div class="num">3.50</div>
+        <div class="label">Mean score<br>wrong metadata</div>
+      </div>
+      <div class="stat-cell">
+        <div class="num">98%</div>
+        <div class="label">Strategy match<br>with envelopes</div>
+      </div>
+    </div>
+
+    <p>Right metadata improves decisions. Wrong metadata is catastrophic. Right > None > Wrong — confirmed across three independent experiments with non-overlapping 95% confidence intervals.</p>
+    <p>Agents generate structurally perfect Babel envelopes 100% of the time. But they're over-confident on derived claims 60% of the time — treating inferences as verified data. That's the specific failure mode the chain auditor catches.</p>
+  </div>
+</section>
+
+<!-- WHAT IT IS -->
+<section>
+  <div class="section-label">The Protocol</div>
+  <h2>Every handoff carries an <em>envelope</em></h2>
+  <p>Six signal types per envelope: confidence (per-assertion with evidence basis), intent, register, affect state, organizational grounds, and trajectory. Five MUST rules reject contradictions. Six SHOULD rules flag risks.</p>
+
+  <div class="code-block fade-in" data-animate>
+    <span class="comment">// Build a measured envelope with the fluent API</span><br>
+    <span class="keyword">import</span> { envelope } <span class="keyword">from</span> <span class="string">'babel-validate'</span>;<br>
+    <br>
+    <span class="keyword">const</span> env = <span class="fn">envelope</span>()<br>
+    &nbsp;&nbsp;.<span class="fn">sender</span>(<span class="string">'scout-market-intel'</span>)<br>
+    &nbsp;&nbsp;.<span class="fn">recipient</span>(<span class="string">'strategist-01'</span>)<br>
+    &nbsp;&nbsp;.<span class="fn">chain</span>(chainId, 0)<br>
+    &nbsp;&nbsp;.<span class="fn">inform</span>()<br>
+    &nbsp;&nbsp;.<span class="fn">verified</span>(<span class="string">'Q3 revenue was $2.1M'</span>, 0.95)<br>
+    &nbsp;&nbsp;.<span class="fn">derived</span>(<span class="string">'Growth rate around 12%'</span>, 0.65)<br>
+    &nbsp;&nbsp;.<span class="fn">reported</span>(<span class="string">'HealthStack entering mid-market'</span>, 0.30)<br>
+    &nbsp;&nbsp;.<span class="fn">boardFacing</span>()<br>
+    &nbsp;&nbsp;.<span class="fn">buildAndValidate</span>();<br>
+    <br>
+    <span class="comment">// Audit a full chain for poisoning</span><br>
+    <span class="keyword">import</span> { auditChain } <span class="keyword">from</span> <span class="string">'babel-validate'</span>;<br>
+    <br>
+    <span class="keyword">const</span> audits = <span class="fn">auditChain</span>([env1, env2, env3]);<br>
+    <span class="comment">// → HIGH risk: basis laundering, confidence inflation</span>
+  </div>
+
+  <p style="font-size: 0.9rem;">Zero dependencies. TypeScript. Works with CrewAI, LangGraph, AutoGen, or any agent framework that passes messages between agents.</p>
+</section>
+
+<!-- ACADEMIC -->
+<section class="dark-section">
+  <div class="dark-inner">
+    <div class="section-label">Validation</div>
+    <h2>Three teams proved <em>we're right</em></h2>
+    <p>Romanchuk & Bondar formally proved that standard agent architectures systematically conflate information transport with epistemic justification — an architectural invariant that cannot be fixed by improving model quality. Kelly's "Epistemic Suite" independently coined "confidence laundering" — exactly what our chain auditor detects. Agentic Uncertainty Quantification proposed verbalized confidence as active control signal. Our grammar rules are the harder version: they reject at the wire level.</p>
+    <p>Their formal proofs. Our implementation. Our empirical results. The full story.</p>
+  </div>
+</section>
+
+<!-- CTA -->
+<section style="text-align: center; padding: 6rem 2rem; position: relative;">
+  <div style="position: absolute; top: 0; left: 50%; transform: translateX(-50%); width: 500px; height: 500px; background: radial-gradient(circle, var(--accent-glow) 0%, transparent 70%); pointer-events: none; opacity: 0.3;"></div>
+  <div class="section-label">Get Started</div>
+  <h2 style="max-width: 600px; margin: 0 auto 1rem;">The grammar is table stakes.<br><em>The auditor is the moat.</em></h2>
+  <p style="max-width: 500px; margin: 0 auto 2rem; text-align: center;">Open source validator. Enterprise chain auditing. Consulting into teams running multi-agent workflows.</p>
+  <div style="display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap;">
+    <a href="https://npmjs.com/package/babel-validate" class="cta-btn" style="font-size: 1rem; padding: 0.8rem 2rem;">npm install babel-validate</a>
+    <a href="mailto:michael@hearth.so" class="hero-secondary" style="padding: 0.8rem 2rem;">michael@hearth.so</a>
+  </div>
+</section>
+
+<footer>
+  <div style="margin-bottom: 0.5rem;">
+    <a href="/">Hearth Extension</a>
+    <a href="/babel">Babel</a>
+    <a href="/research">Research</a>
+    <a href="https://github.com/mdiskint/babel-validate">GitHub</a>
+    <a href="mailto:michael@hearth.so">Email</a>
+  </div>
+  <div>© 2026 Hearth</div>
+</footer>
+
+<script>
+const observer = new IntersectionObserver((entries) => {
+  entries.forEach(entry => {
+    if (entry.isIntersecting) {
+      entry.target.classList.add('visible');
+      observer.unobserve(entry.target);
+    }
+  });
+}, { threshold: 0.15 });
+
+document.querySelectorAll('[data-animate]').forEach(el => observer.observe(el));
+</script>
+
+</body>
+</html>

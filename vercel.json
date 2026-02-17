@@ -1,1 +1,11 @@
-{"buildCommand": null, "outputDirectory": "site"}
+{
+  "buildCommand": null,
+  "outputDirectory": "site",
+  "redirects": [
+    {
+      "source": "/research",
+      "destination": "https://github.com/mdiskint/babel-validate/tree/main/experiments",
+      "permanent": false
+    }
+  ]
+}
